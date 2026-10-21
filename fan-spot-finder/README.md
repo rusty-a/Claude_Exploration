@@ -1,7 +1,7 @@
 # Fan Spot Finder
 
 A browser app that sketches the air flow in a room and searches for the best spot for a pedestal fan.
-Open `app/index.html` in a browser. It needs no build step.
+**[Open the app](https://rusty-a.github.io/Claude_Exploration/fan-spot-finder/app/)** (GitHub Pages), or open `app/index.html` in a browser. It needs no build step.
 
 **Status: a rough model.** 
 [docs/critical-review.md](docs/critical-review.md) 
@@ -47,6 +47,9 @@ Version 12 removed the step that could cause it, but the cause is not known.
 ## References
 
 - Nielsen, P. V. (1990). Specification of a two-dimensional test case. IEA Annex 20. Aalborg University.
-- Buildings 2025, 15(3), 308 (MDPI): measured air speed in front of household fans.
+  See [references/README.md](references/README.md).
+- Wang, K.; Xie, Z.; Xiao, Y.; Zhou, X.; Luo, M. Spatial Distribution of Dynamic Characteristics of Fan Airflows and
+  Their Impact on Thermal Comfort. Buildings 2025, 15(3), 308. https://doi.org/10.3390/buildings15030308.
+  Copy in [references/](references/) under its CC BY 4.0 license.
 - ASHRAE Standard 55-2020, cooling effect of elevated air speed.
 - Tartarini and Schiavon (2020), pythermalcomfort, SoftwareX 12.
