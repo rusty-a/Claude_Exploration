@@ -72,6 +72,8 @@ label.f input,label.f select{width:100%;min-width:0;background:var(--bg);border:
 .itemhead input{flex:1;min-width:0;background:transparent;border:0;border-bottom:1px dashed var(--line);font-weight:500;padding:2px 0}
 .itemhead select{font-size:12px;padding:3px 6px;min-width:0}
 .dot{width:10px;height:10px;border-radius:2px;flex:none}
+.osc{margin-top:6px;font-size:12px;padding:4px 10px}
+.osc[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .x{border:0;background:transparent;color:var(--muted);padding:2px 6px;font-size:16px;line-height:1}
 .x:hover{color:var(--warn)}
 .note{font-size:12px;color:var(--muted);margin:0}
@@ -295,6 +297,20 @@ function makeSim(scene,res,FACES){
     if(lo>hi&&a1>a0)lo=hi=Math.min(n,Math.max(1,Math.round((a0+a1)/2/h+0.5)));
     return [lo,hi];
   }
+  // direction of a fan at time t: an oscillating fan swings sweep/2 each side of its set direction
+  function fanAngle(f,t){return f.angle+(f.osc?(f.sweep==null?90:+f.sweep)/2*Math.sin(2*Math.PI*t/Math.max(2,+f.period||12)):0);}
+  sim.fanAngle=fanAngle;
+  let fanCells=[],fanSc=[];
+  // set the air speed on the faces of every fan cell from the fan's direction now
+  function setFans(){
+    const ok=q=>flag[q]===0||flag[q]===3||flag[q]===4,fx=[],fy=[];
+    for(const f of fanSc){const an=fanAngle(f,sim.time)*Math.PI/180;fx.push(f.speed*Math.cos(an));fy.push(f.speed*Math.sin(an));}
+    for(const [id,fi] of fanCells){const a=fx[fi],b=fy[fi];
+      u[id]=ok(id+1)?a:0;u[id-1]=ok(id-1)?a:0;
+      v[id]=ok(id+sx)?b:0;v[id-sx]=ok(id-sx)?b:0;
+      w[id]=0;w[id-sxy]=0;
+    }
+  }
   sim.build=function(sc){
     const dims=[nx,ny,nz];let vmax=0;
     flag.fill(1);
@@ -317,8 +333,9 @@ function makeSim(scene,res,FACES){
         else{flag[id]=3;outs.push([id,inn,f.n,face,f.s]);}
       }
     }
-    const fanCells=[];
-    for(const fan of sc.fans){
+    fanCells=[];fanSc=sc.fans;
+    for(let fi=0;fi<sc.fans.length;fi++){const fan=sc.fans[fi];
+      // the disk keeps the shape it has at the centre direction; an oscillating fan only turns its jet (see setFans)
       const an=fan.angle*Math.PI/180,dx=Math.cos(an),dy=Math.sin(an),r=Math.max(fan.d/2,0.5*h),slab=0.5*h*(Math.abs(dx)+Math.abs(dy));
       const lo=q=>Math.max(1,Math.floor(q/h-1)),hiC=(q,n)=>Math.min(n,Math.ceil(q/h+2));
       const found=[];
@@ -330,7 +347,7 @@ function makeSim(scene,res,FACES){
         found.push(id);
       }
       if(!found.length){const id=I(Math.min(nx,Math.max(1,Math.round(fan.x/h+0.5))),Math.min(ny,Math.max(1,Math.round(fan.y/h+0.5))),Math.min(nz,Math.max(1,Math.round(fan.z/h+0.5))));if(flag[id]===0)found.push(id);}
-      for(const id of found){flag[id]=4;fanCells.push([id,fan.speed*dx,fan.speed*dy]);}
+      for(const id of found){flag[id]=4;fanCells.push([id,fi]);}
       if(found.length)vmax=Math.max(vmax,fan.speed);
     }
     const free=(A,B)=>(A===0&&(B===0||B===3))||(B===0&&A===3);
@@ -339,12 +356,7 @@ function makeSim(scene,res,FACES){
     for(let k=1;k<=nz;k++)for(let j=0;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);if(free(flag[id],flag[id+sx])){fixV[id]=0;fv.push(id);}else{fixV[id]=1;v[id]=0;}}
     for(let k=0;k<=nz;k++)for(let j=1;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);if(free(flag[id],flag[id+sxy])){fixW[id]=0;fw.push(id);}else{fixW[id]=1;w[id]=0;}}
     for(const [ax,face,val] of inl)(ax===0?u:ax===1?v:w)[face]=val;
-    const ok=q=>flag[q]===0||flag[q]===3||flag[q]===4;
-    for(const [id,fx,fy] of fanCells){
-      u[id]=ok(id+1)?fx:0;u[id-1]=ok(id-1)?fx:0;
-      v[id]=ok(id+sx)?fy:0;v[id-sx]=ok(id-sx)?fy:0;
-      w[id]=0;w[id-sxy]=0;
-    }
+    setFans();
     fu=Int32Array.from(fu);fv=Int32Array.from(fv);fw=Int32Array.from(fw);
     const a=[],b=[],o=[];
     for(let k=1;k<=nz;k++){const zc=(k-0.5)*h;for(let j=1;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);
@@ -384,7 +396,7 @@ function makeSim(scene,res,FACES){
     wallId=Int32Array.from(wi);wallN=Uint8Array.from(wn);pg.fill(0);
     sim.qTot=qTot;sim.heatOn=heatOn;
     sim.vmax=vmax;dt=1.2*h/Math.max(vmax,heatOn?0.6:0.3);
-    sim.hasOut=outs.length>0;sim.hasSup=inl.length>0;sim.hasFan=fanCells.length>0;
+    sim.osc=fanCells.length>0&&sc.fans.some(f=>f.osc);sim.dt=dt;sim.hasOut=outs.length>0;sim.hasSup=inl.length>0;sim.hasFan=fanCells.length>0;
     tzKey="";
   };
   function bc(){
@@ -529,7 +541,7 @@ function makeSim(scene,res,FACES){
   sim.step=function(iters){bc();let e0=0;if(heatOn){wallHeat();e0=sumT()+energyIn();}
     advect();heat();diffuse();
     if(heatOn&&sl.length)sim.eErr=(sumT()-e0)/sl.length/dt;
-    bc();openingLoss();project(iters||40);sim.time+=dt;};
+    bc();openingLoss();project(iters||40);sim.time+=dt;if(sim.osc)setFans();};
   sim.cvel=function(id,o){o[0]=0.5*(u[id]+u[id-1]);o[1]=0.5*(v[id]+v[id-sx]);o[2]=0.5*(w[id]+w[id-sxy]);return o;};
   sim.speed=function(id){return Math.hypot(0.5*(u[id]+u[id-1]),0.5*(v[id]+v[id-sx]),0.5*(w[id]+w[id-sxy]));};
   function targetCells(t){
@@ -699,7 +711,11 @@ function drawBase(){
       if(opt.best){const X=mx(opt.best.x),Y=my(opt.best.y);ctx.strokeStyle="#ffd166";ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(X,Y,11,0,7);ctx.stroke();}
     }
     // fans
-    for(const f of S.fans){const X=mx(f.x),Y=my(f.y),an=f.angle*Math.PI/180,r=Math.max(5,f.d/2*pxm);
+    for(const f of S.fans){const X=mx(f.x),Y=my(f.y),an=G.fanAngle(f,G.time)*Math.PI/180,r=Math.max(5,f.d/2*pxm);
+      if(f.osc&&f.sweep>0){const a0=f.angle*Math.PI/180,hs=f.sweep/2*Math.PI/180,R=Math.max(18,0.6*pxm)+6;   // the swept range
+        ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.beginPath();
+        ctx.moveTo(X+Math.cos(a0-hs)*R,Y-Math.sin(a0-hs)*R);ctx.lineTo(X,Y);ctx.lineTo(X+Math.cos(a0+hs)*R,Y-Math.sin(a0+hs)*R);
+        ctx.arc(X,Y,R,-(a0+hs),-(a0-hs));ctx.stroke();ctx.setLineDash([]);}
       ctx.strokeStyle="#ffffff";ctx.lineWidth=3;ctx.beginPath();
       ctx.moveTo(X-Math.sin(an)*r,Y-Math.cos(an)*r);ctx.lineTo(X+Math.sin(an)*r,Y+Math.cos(an)*r);ctx.stroke();
       ctx.lineWidth=1.5;arrow(ctx,X,Y,an,Math.max(18,0.6*pxm));
@@ -716,7 +732,7 @@ function drawBase(){
       ctx.fillStyle="#ffd166";ctx.font="600 11px "+TH.font;ctx.fillText("You",mx(tc[s.ha]),my(tc[s.va]+hz)-8);}
     // fans seen from the side: stand, head disk, motor, and the blowing direction
     for(const f of S.fans){
-      const an=f.angle*Math.PI/180,dir=[Math.cos(an),Math.sin(an),0],perp=[-Math.sin(an),Math.cos(an),0],fc=[f.x,f.y,f.z];
+      const an=G.fanAngle(f,G.time)*Math.PI/180,dir=[Math.cos(an),Math.sin(an),0],perp=[-Math.sin(an),Math.cos(an),0],fc=[f.x,f.y,f.z];
       const near=Math.abs(sp-fc[s.fa])<=Math.max(0.6,f.d);
       ctx.globalAlpha=near?1:0.4;ctx.strokeStyle="#ffffff";ctx.fillStyle="#ffffff";
       const X=mx(fc[s.ha]),Yh=my(f.z),Y0=my(0),r=Math.max(4,f.d/2*pxm),dh=dir[s.ha];
@@ -800,7 +816,9 @@ function renderLists(){
   $("fans").innerHTML=S.fans.map((f,i)=>`<div class="item" data-list="fans" data-i="${i}">
     <div class="itemhead"><span class="dot" style="background:var(--ink)"></span><input id="fn${i}" data-k="name" value="${esc(f.name)}" aria-label="Fan name"><button class="x" data-del="fans" aria-label="Remove ${esc(f.name)}">×</button></div>
     <div class="grid3">${inp("f"+i+"x","x (m)","x",f.x,'step="0.1"')}${inp("f"+i+"y","y (m)","y",f.y,'step="0.1"')}${inp("f"+i+"z","Hub height (m)","z",f.z,'step="0.1"')}
-    ${inp("f"+i+"a","Direction (°)","angle",f.angle,'step="15"')}${inp("f"+i+"d","Diameter (m)","d",f.d,'step="0.05" min="0.1"')}${inp("f"+i+"s","Air speed (m/s)","speed",f.speed,'step="0.5" min="0.5" max="10"')}</div></div>`).join("")||'<p class="note">No fans yet.</p>';
+    ${inp("f"+i+"a","Direction (°)","angle",f.angle,'step="15"')}${inp("f"+i+"d","Diameter (m)","d",f.d,'step="0.05" min="0.1"')}${inp("f"+i+"s","Air speed (m/s)","speed",f.speed,'step="0.5" min="0.5" max="10"')}</div>
+    <button class="osc" data-osc aria-pressed="${!!f.osc}">Oscillate: ${f.osc?"on":"off"}</button>
+    ${f.osc?`<div class="grid3">${inp("f"+i+"w","Sweep (°)","sweep",f.sweep==null?90:f.sweep,'step="15" min="0" max="180"')}${inp("f"+i+"p","Cycle (s)","period",f.period||12,'step="1" min="2" max="60"')}</div>`:""}</div>`).join("")||'<p class="note">No fans yet.</p>';
   $("ofan").innerHTML=S.fans.map((f,i)=>`<option value="${i}">${esc(f.name)}</option>`).join("");
   $("boxes").innerHTML=S.boxes.map((b,i)=>`<div class="item" data-list="boxes" data-i="${i}">
     <div class="itemhead"><span class="dot" style="background:var(--solid)"></span><input id="bn${i}" data-k="name" value="${esc(b.name)}" aria-label="Box name"><button class="x" data-del="boxes" aria-label="Remove ${esc(b.name)}">×</button></div>
@@ -835,6 +853,8 @@ aside.addEventListener("change",e=>{
   const o=S[item.dataset.list][+item.dataset.i];
   if(k==="name"||k==="kind"||k==="face"){o[k]=t.value;if(k==="kind"&&o.kind==="supply"&&!o.speed)o.speed=1.5;if(k!=="name")renderLists();}
   else if(k==="temp"){const v=parseFloat(t.value);if(!isNaN(v))o.temp=Math.min(50,Math.max(-10,v));}
+  else if(k==="sweep"){o.sweep=Math.min(180,Math.max(0,parseFloat(t.value)||0));}
+  else if(k==="period"){o.period=Math.min(60,Math.max(2,parseFloat(t.value)||12));}
   else o[k]=k==="angle"?(parseFloat(t.value)||0):Math.max(0,parseFloat(t.value)||0);
   sceneChanged();
 });
@@ -842,8 +862,9 @@ aside.addEventListener("click",e=>{
   const t=e.target.closest("button");if(!t)return;
   const R=S.room;
   if(t.dataset.del){const item=t.closest(".item");S[t.dataset.del].splice(+item.dataset.i,1);}
+  else if(t.dataset.osc!=null){const f=S.fans[+t.closest(".item").dataset.i];f.osc=!f.osc;if(f.sweep==null)f.sweep=90;if(!f.period)f.period=12;}
   else if(t.id==="addBox")S.boxes.push({name:"Box "+(S.boxes.length+1),x:R.L/2-0.3,y:R.W/2-0.3,z:0,dx:0.6,dy:0.6,dz:1.0,q:0});
-  else if(t.id==="addFan")S.fans.push({name:"Fan "+(S.fans.length+1),x:R.L/2,y:R.W/2,z:1.0,angle:0,d:0.4,speed:3});
+  else if(t.id==="addFan")S.fans.push({name:"Fan "+(S.fans.length+1),x:R.L/2,y:R.W/2,z:1.0,angle:0,d:0.4,speed:3,osc:false,sweep:90,period:12});
   else if(t.id==="addSup")S.openings.push({kind:"supply",face:"ceiling",u:R.L/2,v:R.W/2,wu:0.6,wv:0.6,speed:1.5});
   else if(t.id==="addOpen")S.openings.push({kind:"open",face:"S",u:R.L/2,v:1.0,wu:0.9,wv:2.0,speed:0});
   else return;
@@ -918,8 +939,11 @@ const COMFORT=${JSON.stringify(COMFORT)};
 ${feelsLike.toString()}
 onmessage=e=>{const m=e.data;
   for(const [k,cd] of m.jobs){const sc=JSON.parse(JSON.stringify(m.scene));Object.assign(sc.fans[m.fan],{x:cd.x,y:cd.y,angle:cd.angle});
-    const s=makeSim(sc,m.res,m.FACES),feels=m.obj==="feels";let acc=0,av=0,n=0;
-    for(let t=0;t<m.steps;t++){s.step(m.iters);if(t>=m.steps-m.avg){
+    const s=makeSim(sc,m.res,m.FACES),feels=m.obj==="feels";let acc=0,av=0,n=0,steps=m.steps,avg=m.avg;
+    // with an oscillating fan, average over one full swing so every direction counts the same
+    if(s.osc){const per=Math.max(...sc.fans.filter(f=>f.osc).map(f=>Math.max(2,+f.period||12))),np=Math.ceil(per/s.dt);
+      if(np>avg){steps+=np-avg;avg=np;}}
+    for(let t=0;t<steps;t++){s.step(m.iters);if(t>=steps-avg){
       if(feels){acc+=s.heatOn?-s.score("cool",sc.target):sc.heat.Tin;av+=s.score("breeze",sc.target);}else acc+=s.score(m.obj,sc.target);n++;}}
     // feels: score is minus the feels-like temperature, so a higher score is still better
     postMessage({k,score:feels?-feelsLike(acc/n,av/n):acc/n,time:s.time,air:acc/n,v:av/n});}
@@ -1047,7 +1071,7 @@ function frame3D(){
 function buildRoom3D(){
   const g=T.roomG;
   while(g.children.length){const c=g.children.pop();c.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
-  T.blades=[];
+  T.blades=[];T.fanG=[];
   const {L,W,H}=S.room;
   const M=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:0.85,metalness:0},o||{}));
   const fl=new THREE.Mesh(new THREE.PlaneGeometry(L,W),M(0x2a3a44));fl.rotation.x=-Math.PI/2;fl.position.copy(at3(L/2,W/2,0));g.add(fl);
@@ -1074,7 +1098,7 @@ function buildRoom3D(){
   const white=M(0xe8eef0),dark=M(0x46545b),blade=M(0xcfe3ea,{transparent:true,opacity:0.9});
   for(const f of S.fans){
     // a pedestal fan whose local +x axis is the blowing direction
-    const fg=new THREE.Group();fg.position.copy(at3(f.x,f.y,0));fg.rotation.y=f.angle*Math.PI/180;
+    const fg=new THREE.Group();fg.position.copy(at3(f.x,f.y,0));fg.rotation.y=f.angle*Math.PI/180;T.fanG.push({g:fg,f});
     const r=Math.max(0.08,f.d/2),z=Math.max(0.15,f.z);
     const base=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.18,0.04,28),dark);base.position.y=0.02;fg.add(base);
     const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.017,z-0.04,10),white);pole.position.y=0.04+(z-0.04)/2;fg.add(pole);
@@ -1141,6 +1165,7 @@ function renderThree(){
   }
   particles3D();T.geo.setDrawRange(0,view.trace?T.NP*2:0);
   if(!reduceMotion&&running)for(const b of T.blades)b.g.rotation.x+=b.w;
+  for(const q of T.fanG)if(q.f.osc)q.g.rotation.y=G.fanAngle(q.f,G.time)*Math.PI/180;
   if(T.ctl)T.ctl.update();
   T.R.render(T.sc,T.cam);
 }
