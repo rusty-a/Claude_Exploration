@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head><body>
+<title>Fan Spot Finder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: drafting-table tool. Flow plot on the left, spec sheet on the right; stacks on phones. */
+:root{
+  --bg:#eef1f1; --panel:#f8fafa; --ink:#1a2528; --muted:#5a6a6e; --line:#cfd8da; --accent:#0f6f7c;
+  --supply:#2f6fd6; --open:#c86a12; --solid:#8a9396; --warn:#a53a2a; --plot:#0d1b2a; --good:#2f7d4f;
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101719; --panel:#172023; --ink:#dce5e6; --muted:#91a2a6; --line:#2b383b; --accent:#4fb3bf;
+  --supply:#6f9ff0; --open:#eb9a50; --solid:#5f696c; --warn:#e57d6a; --plot:#0a141f; --good:#6cc08f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101719; --panel:#172023; --ink:#dce5e6; --muted:#91a2a6; --line:#2b383b; --accent:#4fb3bf;
+  --supply:#6f9ff0; --open:#eb9a50; --solid:#5f696c; --warn:#e57d6a; --plot:#0a141f; --good:#6cc08f; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
+.app{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:20px}
+@media (max-width:900px){.app{grid-template-columns:minmax(0,1fr)}}
+header{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13px}
+.main{min-width:0;display:flex;flex-direction:column;gap:12px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:500}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 10px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.slice{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.slice input{width:130px;accent-color:var(--accent)}
+.plotwrap{display:flex;justify-content:center;background:var(--plot);border-radius:8px;padding:6px;overflow:hidden}
+.stack{position:relative}
+.stack canvas{display:block}
+#topc{position:absolute;inset:0}
+#three{width:100%}
+#three canvas{display:block;margin:0 auto;border-radius:4px;cursor:grab;touch-action:none}
+#three .note{padding:24px;color:#dce5e6}
+[hidden]{display:none!important}
+.caption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;align-items:center;font-size:12px;color:var(--muted)}
+.legend{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11px}
+.legend canvas{border-radius:2px;max-width:40vw}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stat{background:var(--panel);padding:10px 12px}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.stat .v{font-family:var(--f-mono);font-size:18px;font-variant-numeric:tabular-nums;margin-top:2px}
+.stat .n{font-size:11px;color:var(--muted)}
+.warn{color:var(--warn);font-size:13px;font-weight:500}
+aside{min-width:0;display:flex;flex-direction:column;gap:16px}
+section.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+section.opt{border-color:var(--accent)}
+.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:0;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card h2 button{font-size:12px;text-transform:none;letter-spacing:0;padding:3px 8px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px}
+label.f{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted);min-width:0}
+label.f input,label.f select{width:100%;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-family:var(--f-mono);font-size:12px;color:var(--ink)}
+.item{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
+.item:first-child{border-top:0;padding-top:0}
+.itemhead{display:flex;gap:8px;align-items:center}
+.itemhead input{flex:1;min-width:0;background:transparent;border:0;border-bottom:1px dashed var(--line);font-weight:500;padding:2px 0}
+.itemhead select{font-size:12px;padding:3px 6px;min-width:0}
+.dot{width:10px;height:10px;border-radius:2px;flex:none}
+.x{border:0;background:transparent;color:var(--muted);padding:2px 6px;font-size:16px;line-height:1}
+.x:hover{color:var(--warn)}
+.note{font-size:12px;color:var(--muted);margin:0}
+.note b{color:var(--ink);font-weight:500}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.result{font-size:13px;margin:0}
+.result b{font-family:var(--f-mono);font-weight:500}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <header>
+    <h1>Fan Spot Finder</h1>
+    <span class="sub">Lay out a room, mark where you sit, and let the solver try fan spots for you. Coarse airflow model: good for patterns, not for exact numbers.</span>
+  </header>
+
+  <div class="main">
+    <div class="toolbar">
+      <button class="primary" id="run">Pause</button>
+      <button id="reset">Restart flow</button>
+      <div class="seg" role="group" aria-label="View">
+        <button data-mode="plan" aria-pressed="true">Plan</button>
+        <button data-mode="long" aria-pressed="false">Section x</button>
+        <button data-mode="cross" aria-pressed="false">Section y</button>
+        <button data-mode="corner" aria-pressed="false">Corner 3D</button>
+      </div>
+      <div class="slice"><label for="pos" id="poslab">z 1.10 m</label><input type="range" id="pos" min="0" max="1" step="0.05" value="0.4"></div>
+      <select id="field" aria-label="Color by">
+        <option value="speed">Color: air speed</option>
+        <option value="fresh">Color: outside air</option>
+        <option value="temp">Color: temperature</option>
+      </select>
+      <select id="trace" aria-label="Flow traces">
+        <option value="on">Traces on</option>
+        <option value="off">Traces off</option>
+      </select>
+    </div>
+
+    <div class="plotwrap" id="wrap"><div class="stack" id="stack"><canvas id="base"></canvas><canvas id="topc"></canvas></div><div id="three" hidden></div></div>
+
+    <div class="caption">
+      <span id="cap">Plan at z = 1.10 m. North is up.</span>
+      <span id="key">Gray: cut by the slice. Tinted: below or behind. Dashed: above or in front.</span>
+      <span class="legend"><span id="lmin">0</span><canvas id="leg" width="150" height="10"></canvas><span id="lmax">1.5 m/s</span></span>
+    </div>
+    <div class="warn" id="warn" hidden></div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">Breeze at you</div><div class="v" id="sYou">0</div><div class="n">mean m/s in your zone</div></div>
+      <div class="stat"><div class="k">Room air speed</div><div class="v" id="sSpd">0</div><div class="n">mean m/s, 0.1 to 1.8 m up</div></div>
+      <div class="stat"><div class="k">Still air</div><div class="v" id="sStill">0%</div><div class="n">of that zone below 0.05 m/s</div></div>
+      <div class="stat"><div class="k">Outside air</div><div class="v" id="sFresh">0%</div><div class="n">share that came in from outside</div></div>
+      <div class="stat"><div class="k">Air at you</div><div class="v" id="sTy">–</div><div class="n" id="sTm">room mean</div></div>
+      <div class="stat"><div class="k">Feels like</div><div class="v" id="sFeel">–</div><div class="n" id="sCE">air speed cooling</div></div>
+      <div class="stat"><div class="k">Head to ankle</div><div class="v" id="sDT">–</div><div class="n">1.1 m minus 0.1 m at you</div></div>
+      <div class="stat"><div class="k">Simulated time</div><div class="v" id="sTime">0 s</div><div class="n" id="sGrid">grid</div></div>
+    </div>
+  </div>
+
+  <aside>
+    <section class="card opt">
+      <h2>Find the best fan spot</h2>
+      <div class="grid2">
+        <label class="f">Goal<select id="obj"><option value="breeze">Breeze on me</option><option value="stir">Stir the whole room</option><option value="cool">Coolest air at me</option><option value="feels">Feels coolest to me</option></select></label>
+        <label class="f">Fan to move<select id="ofan"></select></label>
+      </div>
+      <div class="grid3">
+        <label class="f">You x (m)<input id="tx" type="number" step="0.1"></label>
+        <label class="f">You y (m)<input id="ty" type="number" step="0.1"></label>
+        <label class="f">Face height (m)<input id="tz" type="number" step="0.1" min="0.3"></label>
+      </div>
+      <div class="row"><button class="primary" id="go">Find best spot</button><button id="apply" hidden>Move fan there</button></div>
+      <div class="bar" id="bar" hidden><i></i></div>
+      <p class="result" id="res">Tries about 150 spots and directions on a coarse grid, then checks the top 6 on a finer grid. Dots on the plan show each spot's best result.</p>
+    </section>
+
+    <section class="card">
+      <h2>Fans <button id="addFan">Add fan</button></h2>
+      <div id="fans"></div>
+      <p class="note">Direction is a compass bearing in degrees: 0 east, 90 north, 180 west, 270 south. Drag fans, boxes and "You" on the plan.</p>
+    </section>
+
+    <section class="card">
+      <h2>Boxes <button id="addBox">Add box</button></h2>
+      <div id="boxes"></div>
+    </section>
+
+    <section class="card">
+      <h2>Openings <span class="row"><button id="addOpen">Add opening</button><button id="addSup">Add vent</button></span></h2>
+      <div id="opens"></div>
+      <p class="note"><b>Opening</b> is a window or door where air moves freely in or out. <b>Vent</b> pushes air in at a set speed.</p>
+    </section>
+
+    <section class="card">
+      <h2>Room</h2>
+      <div class="grid3">
+        <label class="f">Length x (m)<input id="rL" type="number" step="0.1" min="1" max="30"></label>
+        <label class="f">Width y (m)<input id="rW" type="number" step="0.1" min="1" max="30"></label>
+        <label class="f">Height z (m)<input id="rH" type="number" step="0.1" min="1.5" max="10"></label>
+      </div>
+      <p class="note">Origin is the south-west floor corner. x points east, y points north. Changing the room restarts the flow.</p>
+    </section>
+
+    <section class="card">
+      <h2>Heat</h2>
+      <div class="grid2">
+        <label class="f">Heat and buoyancy<select id="hOn"><option value="on">On</option><option value="off">Off</option></select></label>
+        <label class="f">Your body heat (W)<input id="hq" type="number" step="10" min="0" max="300"></label>
+        <label class="f">Room at start (°C)<input id="hTin" type="number" step="0.5" min="-10" max="50"></label>
+        <label class="f">Outside air (°C)<input id="hTout" type="number" step="0.5" min="-10" max="50"></label>
+        <label class="f">Walls and furniture (°C)<input id="hTw" type="number" step="0.5" min="-10" max="50"></label>
+      </div>
+      <p class="note">Give a box a heat output (a computer about 150 W, a TV about 100 W, a radiator 500 to 1500 W). A seated person gives about 70 to 100 W. Warm air rises, and air through an opening comes in at the outside temperature. Walls and furniture are heavy, so they stay at the temperature you set and give or take heat from the air next to them (3 W/m²K). Changing the start temperature restarts the flow.</p>
+      <p class="note"><b>Feels like</b> is the air temperature at you minus the cooling effect of the air speed (ASHRAE 55, from the standard effective temperature). It assumes you sit (1.1 met) in light summer clothes (0.5 clo), 50 % humidity, and walls at the air temperature.</p>
+    </section>
+
+    <section class="card">
+      <h2>Model</h2>
+      <label class="f">Turbulence<select id="turb">
+        <option value="fan">Indoor, tuned to fan data (default)</option>
+        <option value="off">Off</option>
+        <option value="smag">Smagorinsky</option>
+        <option value="room">Indoor zero-equation (Chen and Xu)</option></select></label>
+      <p class="note" id="turbnote"></p>
+      <p class="note">Left out: walls that warm up or cool down over time, sun, and radiation. The grid has about 40 cells along the longest side. A fan is a disk of cells that pushes air at a set speed. Use the app to compare spots, not to promise a number.</p>
+    </section>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const FACES={
+  W:{n:0,s:0,ua:1,va:2,name:"West wall"}, E:{n:0,s:1,ua:1,va:2,name:"East wall"},
+  S:{n:1,s:0,ua:0,va:2,name:"South wall"}, N:{n:1,s:1,ua:0,va:2,name:"North wall"},
+  floor:{n:2,s:0,ua:0,va:1,name:"Floor"}, ceiling:{n:2,s:1,ua:0,va:1,name:"Ceiling"}};
+const AX="xyz";
+
+// Example: a home office with a desk on the south wall, a shelf on the west wall, an open window on the north wall.
+const S={room:{L:5,W:4,H:2.6},
+  boxes:[
+    {name:"Desk",x:3.0,y:0.15,z:0,dx:1.5,dy:0.7,dz:0.75,q:150},
+    {name:"Shelf",x:0.1,y:1.6,z:0,dx:0.35,dy:1.2,dz:1.9,q:0},
+    {name:"Bed",x:2.6,y:2.3,z:0,dx:2.0,dy:1.5,dz:0.5,q:0}],
+  openings:[{kind:"open",face:"N",u:1.4,v:1.5,wu:1.0,wv:1.2,speed:0}],
+  fans:[{name:"Pedestal fan",x:1.1,y:0.5,z:1.0,angle:90,d:0.4,speed:3}],
+  target:{x:3.75,y:1.25,z:1.1,q:70},turb:"fan",heat:{on:true,Tin:26,Tout:28,Twall:26}};
+
+// Standard effective temperature (Gagge two-node model, ASHRAE 55 cooling-effect variant) and the cooling effect of air speed.
+function setTemp(tdb,tr,v,rh,met,clo){
+  const pv=rh*Math.exp(18.6686-4030.183/(tdb+235))/100,A=1.8258,psat=t=>Math.exp(18.6686-4030.183/(t+235));
+  const vel=Math.max(v,0.1),W=70,MF=58.2,SBC=5.6697e-8,CSW=170,CDIL=120,CSTR=0.5,TSN=33.7,TCN=36.8;
+  let alfa=0.1;const TBN=alfa*TSN+(1-alfa)*TCN,SBN=6.3;
+  let tsk=TSN,tcr=TCN,mbl=SBN,esk=0.1*met,qs=0,w=0,erw=0,edf=0,emax=0;
+  const rclo=0.155*clo,facl=1+0.15*clo,lr=2.2,rm=met*MF;let m=met*MF;
+  const icl=clo>0?0.45:1,wmax=clo>0?0.59*Math.pow(vel,-0.08):0.38*Math.pow(vel,-0.29);
+  const hcc=Math.max(3,8.600001*Math.pow(vel,0.53));
+  let hr=4.7,ht=hr+hcc,ra=1/(facl*ht),top=(hr*tr+hcc*tdb)/ht;
+  const qres=0.0023*m*(44-pv),cres=0.0014*m*(34-tdb);
+  for(let n=1;n<60;n++){
+    let tcl=(ra*tsk+rclo*top)/(ra+rclo);
+    for(let it=0;it<=150;it++){hr=4*0.95*SBC*Math.pow((tcl+tr)/2+273.15,3)*0.73;ht=hr+hcc;ra=1/(facl*ht);top=(hr*tr+hcc*tdb)/ht;
+      const t2=(ra*tsk+rclo*top)/(ra+rclo),done=Math.abs(t2-tcl)<=0.01;tcl=t2;if(done)break;}
+    qs=(tsk-top)/(ra+rclo);
+    const hfcs=(tcr-tsk)*(5.28+1.163*mbl),scr=m-hfcs-qres-cres,ssk=hfcs-qs-esk;
+    tsk+=ssk*A/(0.97*alfa*W*60);tcr+=scr*A/(0.97*(1-alfa)*W*60);
+    const tb=alfa*tsk+(1-alfa)*tcr,sk=tsk-TSN,warm=Math.max(sk,0),cold=Math.max(-sk,0),cr=tcr-TCN,cw=Math.max(cr,0),cc=Math.max(-cr,0),wb=Math.max(tb-TBN,0);
+    mbl=Math.max(0.5,Math.min(90,(SBN+CDIL*cw)/(1+CSTR*cold)));
+    const mrsw=Math.min(500,CSW*wb*Math.exp(warm/10.7));erw=0.68*mrsw;
+    const rea=1/(lr*facl*hcc),recl=rclo/(lr*icl);
+    emax=(psat(tsk)-pv)/(rea+recl);if(emax===0)emax=0.001;
+    let prsw=erw/emax;w=0.06+0.94*prsw;edf=w*emax-erw;
+    if(w>wmax){w=wmax;prsw=wmax/0.94;erw=prsw*emax;edf=0.06*(1-prsw)*emax;}
+    if(emax<0){edf=0;erw=0;w=wmax;}
+    esk=erw+edf;m=rm+19.4*cold*cc;alfa=0.0417737+0.7451833/(mbl+0.585417);
+  }
+  const qsk=qs+esk,pssk=psat(tsk),hrs=hr,hcs=3,hts=hcs+hrs;
+  const rclos=1.52/(met+0.6944)-0.1835,rcls=0.155*rclos,facls=1+0.25*rclos,fcls=1/(1+0.155*facls*hts*rclos);
+  const ims=0.45,icls=ims*hcs/hts*(1-fcls)/(hcs/hts-fcls*ims);
+  const ras=1/(facls*hts),reas=1/(lr*facls*hcs),recls=rcls/(lr*icls),hds=1/(ras+rcls),hes=1/(reas+recls);
+  let s=Math.round((tsk-qsk/hds)*100)/100,dx=100;
+  const f=x=>qsk-hds*(tsk-x)-w*hes*(pssk-0.5*psat(x));
+  for(let k=0;k<100&&Math.abs(dx)>0.01;k++){const e1=f(s),e2=f(s+1e-4),sn=s-1e-4*e1/(e2-e1);dx=sn-s;s=sn;}
+  return s;
+}
+function coolingEffect(t,v,rh,met,clo){
+  if(!(v>0.1))return 0;
+  const s0=setTemp(t,t,v,rh,met,clo),g=x=>setTemp(t-x,t-x,0.1,rh,met,clo)-s0;
+  let a=0,b=40,ga=g(a);if(ga*g(b)>0)return 0;
+  for(let k=0;k<30&&b-a>0.005;k++){const c=(a+b)/2,gc=g(c);if(ga*gc<=0)b=c;else{a=c;ga=gc;}}
+  return (a+b)/2;
+}
+// what the air feels like to a seated person in light summer clothes: air temperature minus the
+// ASHRAE 55 cooling effect of the air speed. Fixed: 1.1 met, 0.5 clo, 50 % humidity, walls at air temperature.
+const COMFORT={met:1.1,clo:0.5,rh:50};
+function feelsLike(t,v){return t-coolingEffect(t,v,COMFORT.rh,COMFORT.met,COMFORT.clo);}
+
+/* ---------- solver: staggered grid, semi-Lagrangian advection, SOR pressure projection.
+   Self-contained so the optimizer can run copies of it in Web Workers. ---------- */
+function makeSim(scene,res,FACES){
+  const {L,W,H}=scene.room;
+  const h=Math.max(L/res,W/res,H/Math.max(8,Math.round(res*0.45)),0.05);
+  const nx=Math.max(3,Math.round(L/h)),ny=Math.max(3,Math.round(W/h)),nz=Math.max(3,Math.round(H/h));
+  const sx=nx+2,sy=ny+2,sxy=sx*sy,N=sxy*(nz+2);
+  const F=()=>new Float32Array(N),U8=()=>new Uint8Array(N);
+  const flag=U8(),fixU=U8(),fixV=U8(),fixW=U8();
+  const HT=scene.heat||{on:false,Tin:26,Tout:26};
+  let u=F(),v=F(),w=F(),c=F().fill(1),u0=F(),v0=F(),w0=F(),c0=F(),tp=F().fill(+HT.Tin),tp0=F();
+  const Ts=F(),pg=F();   // heat source per cell in K/s; pressure in the opening ghost cells
+  const p=F(),div=F(),nut=F(),wd=F(),cu=F(),cv=F(),cw=F();
+  const I=(i,j,k)=>i+sx*j+sxy*k;
+  const OM=Math.min(1.9,2/(1+Math.sin(Math.PI/Math.max(nx,ny,nz))));
+  let wallId=new Int32Array(0),wallN=new Uint8Array(0),Tw=26,HW=3,fu,fv,fw,fl,sl,occ,outs=[],inG=[],inT=[],dt=0.1,tz=null,tzKey="",heatOn=false,Tout=26,beta=1/299;
+  const sim={h,nx,ny,nz,sx,sy,sxy,N,flag,time:0,vmax:0,turb:scene.turb||"fan"};
+  Object.defineProperties(sim,{u:{get:()=>u},v:{get:()=>v},w:{get:()=>w},c:{get:()=>c},tp:{get:()=>tp}});
+  function rangeIn(a0,a1,n){
+    let lo=Math.max(1,Math.ceil(a0/h+0.5)),hi=Math.min(n,Math.floor(a1/h+0.5));
+    if(lo>hi&&a1>a0)lo=hi=Math.min(n,Math.max(1,Math.round((a0+a1)/2/h+0.5)));
+    return [lo,hi];
+  }
+  sim.build=function(sc){
+    const dims=[nx,ny,nz];let vmax=0;
+    flag.fill(1);
+    for(let k=1;k<=nz;k++)for(let j=1;j<=ny;j++)for(let i=1;i<=nx;i++)flag[I(i,j,k)]=0;
+    for(const b of sc.boxes){
+      const [i0,i1]=rangeIn(b.x,b.x+b.dx,nx),[j0,j1]=rangeIn(b.y,b.y+b.dy,ny),[k0,k1]=rangeIn(b.z,b.z+b.dz,nz);
+      for(let k=k0;k<=k1;k++)for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)flag[I(i,j,k)]=1;
+    }
+    const inl=[];outs=[];inG=[];inT=[];
+    for(const o of sc.openings){
+      const f=FACES[o.face],sup=o.kind==="supply";
+      const [a0,a1]=rangeIn(o.u-o.wu/2,o.u+o.wu/2,dims[f.ua]),[b0,b1]=rangeIn(o.v-o.wv/2,o.v+o.wv/2,dims[f.va]);
+      if(sup)vmax=Math.max(vmax,o.speed);
+      for(let a=a0;a<=a1;a++)for(let b=b0;b<=b1;b++){
+        const co=[0,0,0];co[f.ua]=a;co[f.va]=b;co[f.n]=f.s?dims[f.n]+1:0;
+        const id=I(co[0],co[1],co[2]);co[f.n]=f.s?dims[f.n]:1;const inn=I(co[0],co[1],co[2]);
+        if(flag[inn]===1)continue;
+        const face=f.s?inn:id;   // the face between the ghost cell and the room cell
+        if(sup){flag[id]=2;inG.push(id);inT.push(o.temp==null?+(sc.heat||HT).Tout:+o.temp);inl.push([f.n,face,(f.s?-1:1)*o.speed]);}
+        else{flag[id]=3;outs.push([id,inn,f.n,face,f.s]);}
+      }
+    }
+    const fanCells=[];
+    for(const fan of sc.fans){
+      const an=fan.angle*Math.PI/180,dx=Math.cos(an),dy=Math.sin(an),r=Math.max(fan.d/2,0.5*h),slab=0.5*h*(Math.abs(dx)+Math.abs(dy));
+      const lo=q=>Math.max(1,Math.floor(q/h-1)),hiC=(q,n)=>Math.min(n,Math.ceil(q/h+2));
+      const found=[];
+      for(let k=lo(fan.z-r);k<=hiC(fan.z+r,nz);k++)for(let j=lo(fan.y-r);j<=hiC(fan.y+r,ny);j++)for(let i=lo(fan.x-r);i<=hiC(fan.x+r,nx);i++){
+        const id=I(i,j,k);if(flag[id]!==0)continue;
+        const rx=(i-0.5)*h-fan.x,ry=(j-0.5)*h-fan.y,rz=(k-0.5)*h-fan.z,al=rx*dx+ry*dy;
+        if(Math.abs(al)>slab)continue;
+        const ph=-rx*dy+ry*dx;if(ph*ph+rz*rz>r*r)continue;
+        found.push(id);
+      }
+      if(!found.length){const id=I(Math.min(nx,Math.max(1,Math.round(fan.x/h+0.5))),Math.min(ny,Math.max(1,Math.round(fan.y/h+0.5))),Math.min(nz,Math.max(1,Math.round(fan.z/h+0.5))));if(flag[id]===0)found.push(id);}
+      for(const id of found){flag[id]=4;fanCells.push([id,fan.speed*dx,fan.speed*dy]);}
+      if(found.length)vmax=Math.max(vmax,fan.speed);
+    }
+    const free=(A,B)=>(A===0&&(B===0||B===3))||(B===0&&A===3);
+    fu=[];fv=[];fw=[];
+    for(let k=1;k<=nz;k++)for(let j=1;j<=ny;j++)for(let i=0;i<=nx;i++){const id=I(i,j,k);if(free(flag[id],flag[id+1])){fixU[id]=0;fu.push(id);}else{fixU[id]=1;u[id]=0;}}
+    for(let k=1;k<=nz;k++)for(let j=0;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);if(free(flag[id],flag[id+sx])){fixV[id]=0;fv.push(id);}else{fixV[id]=1;v[id]=0;}}
+    for(let k=0;k<=nz;k++)for(let j=1;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);if(free(flag[id],flag[id+sxy])){fixW[id]=0;fw.push(id);}else{fixW[id]=1;w[id]=0;}}
+    for(const [ax,face,val] of inl)(ax===0?u:ax===1?v:w)[face]=val;
+    const ok=q=>flag[q]===0||flag[q]===3||flag[q]===4;
+    for(const [id,fx,fy] of fanCells){
+      u[id]=ok(id+1)?fx:0;u[id-1]=ok(id-1)?fx:0;
+      v[id]=ok(id+sx)?fy:0;v[id-sx]=ok(id-sx)?fy:0;
+      w[id]=0;w[id-sxy]=0;
+    }
+    fu=Int32Array.from(fu);fv=Int32Array.from(fv);fw=Int32Array.from(fw);
+    const a=[],b=[],o=[];
+    for(let k=1;k<=nz;k++){const zc=(k-0.5)*h;for(let j=1;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);
+      if(flag[id]===0){a.push(id);b.push(id);if(zc>=0.1&&zc<=1.8)o.push(id);}else if(flag[id]===4)b.push(id);}}
+    fl=Int32Array.from(a);sl=Int32Array.from(b);occ=Int32Array.from(o);
+    for(let id=0;id<N;id++)if(flag[id]!==0)p[id]=0;
+    // distance to the nearest wall or box, by a breadth-first walk over the grid
+    const dist=new Int32Array(N).fill(-1),q=new Int32Array(N);let qh=0,qt=0;
+    for(let id=0;id<N;id++)if(flag[id]===1){dist[id]=0;q[qt++]=id;}
+    while(qh<qt){const id=q[qh++],d=dist[id]+1;
+      for(const nb of [id+1,id-1,id+sx,id-sx,id+sxy,id-sxy]){if(nb<0||nb>=N||dist[nb]>=0)continue;const f=flag[nb];if(f!==0&&f!==4)continue;dist[nb]=d;q[qt++]=nb;}}
+    for(let id=0;id<N;id++)wd[id]=dist[id]>0?(dist[id]-0.5)*h:dist[id]===0?0:10;
+    cu.fill(0);cv.fill(0);cw.fill(0);nut.fill(0);
+    // heat: box surfaces and the person release heat into the air cells next to them (walls are adiabatic)
+    const ht=sc.heat||HT;heatOn=!!ht.on;Tout=+ht.Tout;beta=1/(Tout+273.15);Ts.fill(0);
+    const RC=1.2*1005*h*h*h;let qTot=0;
+    if(heatOn){
+      for(const b of sc.boxes){if(!(b.q>0))continue;
+        const [i0,i1]=rangeIn(b.x,b.x+b.dx,nx),[j0,j1]=rangeIn(b.y,b.y+b.dy,ny),[k0,k1]=rangeIn(b.z,b.z+b.dz,nz);
+        const nb=new Set();
+        for(let k=k0;k<=k1;k++)for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const id=I(i,j,k);
+          for(const q of [id+1,id-1,id+sx,id-sx,id+sxy,id-sxy])if(flag[q]===0)nb.add(q);}
+        if(nb.size){for(const q of nb)Ts[q]+=b.q/(RC*nb.size);qTot+=+b.q;}
+      }
+      const t=sc.target,tq=t&&t.q>0?+t.q:0;
+      if(tq){const a=[];
+        for(let k=1;k<=nz;k++)for(let j=1;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);if(flag[id]!==0)continue;
+          const dx=(i-0.5)*h-t.x,dy=(j-0.5)*h-t.y,z=(k-0.5)*h;if(dx*dx+dy*dy<=Math.max(0.04,0.36*h*h)&&z>=0.05&&z<=Math.max(t.z,0.3))a.push(id);}
+        if(!a.length){const id=I(Math.min(nx,Math.max(1,Math.round(t.x/h+0.5))),Math.min(ny,Math.max(1,Math.round(t.y/h+0.5))),1);if(flag[id]===0)a.push(id);}
+        for(const id of a)Ts[id]+=tq/(RC*a.length);if(a.length)qTot+=tq;}
+    }
+    // walls and furniture: heavy, so they keep a fixed temperature; the air next to them exchanges
+    // heat by natural convection, about 3 W/m2K
+    Tw=ht.Twall==null?+ht.Tin:+ht.Twall;HW=ht.hw==null?3:+ht.hw;const wi=[],wn=[];
+    if(heatOn)for(let k=1;k<=nz;k++)for(let j=1;j<=ny;j++)for(let i=1;i<=nx;i++){const id=I(i,j,k);if(flag[id]!==0)continue;
+      let n=0;for(const q of [id+1,id-1,id+sx,id-sx,id+sxy,id-sxy])if(flag[q]===1)n++;if(n){wi.push(id);wn.push(n);}}
+    wallId=Int32Array.from(wi);wallN=Uint8Array.from(wn);pg.fill(0);
+    sim.qTot=qTot;sim.heatOn=heatOn;
+    sim.vmax=vmax;dt=1.2*h/Math.max(vmax,heatOn?0.6:0.3);
+    sim.hasOut=outs.length>0;sim.hasSup=inl.length>0;sim.hasFan=fanCells.length>0;
+    tzKey="";
+  };
+  function bc(){
+    for(let n=0;n<inG.length;n++){c[inG[n]]=0;tp[inG[n]]=inT[n];}
+    for(const [id,inn,ax,face,s] of outs){
+      const vel=(ax===0?u:ax===1?v:w)[face],inflow=s?vel<0:vel>0;
+      c[id]=inflow?0:c[inn];   // air coming in from outside counts as fresh
+      tp[id]=inflow?Tout:tp[inn];
+    }
+  }
+  function samp(f,x,y,z){
+    const i0=x|0,j0=y|0,k0=z|0,fx=x-i0,fy=y-j0,fz=z-k0,gx=1-fx,gy=1-fy,gz=1-fz,a=i0+sx*j0+sxy*k0;
+    return gz*(gy*(gx*f[a]+fx*f[a+1])+fy*(gx*f[a+sx]+fx*f[a+sx+1]))+fz*(gy*(gx*f[a+sxy]+fx*f[a+sxy+1])+fy*(gx*f[a+sxy+sx]+fx*f[a+sxy+sx+1]));
+  }
+  const cl=(q,lo,hi)=>q<lo?lo:q>hi?hi:q;
+  function advect(){
+    const s=dt/h,X=nx+0.5,Y=ny+0.5,Z=nz+0.5;
+    u0.set(u);v0.set(v);w0.set(w);c0.set(c);
+    for(let n=0;n<fu.length;n++){const id=fu[n],k=(id/sxy)|0,r=id-k*sxy,j=(r/sx)|0,i=r-j*sx;
+      const vv=0.25*(v[id]+v[id-sx]+v[id+1]+v[id+1-sx]),ww=0.25*(w[id]+w[id-sxy]+w[id+1]+w[id+1-sxy]);
+      u0[id]=samp(u,cl(i+0.5-s*u[id],0.5,X)-0.5,cl(j-s*vv,0.5,Y),cl(k-s*ww,0.5,Z));}
+    for(let n=0;n<fv.length;n++){const id=fv[n],k=(id/sxy)|0,r=id-k*sxy,j=(r/sx)|0,i=r-j*sx;
+      const uu=0.25*(u[id]+u[id-1]+u[id+sx]+u[id+sx-1]),ww=0.25*(w[id]+w[id-sxy]+w[id+sx]+w[id+sx-sxy]);
+      v0[id]=samp(v,cl(i-s*uu,0.5,X),cl(j+0.5-s*v[id],0.5,Y)-0.5,cl(k-s*ww,0.5,Z));}
+    for(let n=0;n<fw.length;n++){const id=fw[n],k=(id/sxy)|0,r=id-k*sxy,j=(r/sx)|0,i=r-j*sx;
+      const uu=0.25*(u[id]+u[id-1]+u[id+sxy]+u[id+sxy-1]),vv=0.25*(v[id]+v[id-sx]+v[id+sxy]+v[id+sxy-sx]);
+      w0[id]=samp(w,cl(i-s*uu,0.5,X),cl(j-s*vv,0.5,Y),cl(k+0.5-s*w[id],0.5,Z)-0.5);}
+    for(let n=0;n<sl.length;n++){const id=sl[n],k=(id/sxy)|0,r=id-k*sxy,j=(r/sx)|0,i=r-j*sx;
+      const x=cl(i-s*0.5*(u[id]+u[id-1]),0.5,X),y=cl(j-s*0.5*(v[id]+v[id-sx]),0.5,Y),z=cl(k-s*0.5*(w[id]+w[id-sxy]),0.5,Z);
+      const i0=x|0,j0=y|0,k0=z|0,fx=x-i0,fy=y-j0,fz=z-k0,a=i0+sx*j0+sxy*k0;
+      const ids=[a,a+1,a+sx,a+sx+1,a+sxy,a+sxy+1,a+sxy+sx,a+sxy+sx+1];
+      const ws=[(1-fx)*(1-fy)*(1-fz),fx*(1-fy)*(1-fz),(1-fx)*fy*(1-fz),fx*fy*(1-fz),(1-fx)*(1-fy)*fz,fx*(1-fy)*fz,(1-fx)*fy*fz,fx*fy*fz];
+      let acc=0,ws_=0;   // the tracer skips solid cells so walls neither add nor remove air
+      for(let q=0;q<8;q++)if(flag[ids[q]]!==1){acc+=ws[q]*c[ids[q]];ws_+=ws[q];}
+      if(ws_>1e-6)c0[id]=acc/ws_;}
+    if(heatOn)advectT();
+    let t=u;u=u0;u0=t;t=v;v=v0;v0=t;t=w;w=w0;w0=t;t=c;c=c0;c0=t;
+  }
+  // temperature moves by first-order upwind fluxes through the cell faces: never overshoots and,
+  // with the divergence-free faces, keeps the heat. Sub-steps keep it stable when the air is fast.
+  function advectT(){
+    const s=dt/h;let mx=0;
+    for(let n=0;n<sl.length;n++){const id=sl[n];
+      const a=Math.max(0,u[id-1])+Math.max(0,-u[id])+Math.max(0,v[id-sx])+Math.max(0,-v[id])+Math.max(0,w[id-sxy])+Math.max(0,-w[id]);
+      if(a>mx)mx=a;}
+    const ns=Math.max(1,Math.ceil(mx*s/0.9)),k=s/ns;
+    for(let it=0;it<ns;it++){tp0.set(tp);
+      for(let n=0;n<sl.length;n++){const id=sl[n],T=tp0[id];let d=0,f;
+        f=u[id-1];if(f>0)d+=f*(tp0[id-1]-T);f=u[id];if(f<0)d-=f*(tp0[id+1]-T);
+        f=v[id-sx];if(f>0)d+=f*(tp0[id-sx]-T);f=v[id];if(f<0)d-=f*(tp0[id+sx]-T);
+        f=w[id-sxy];if(f>0)d+=f*(tp0[id-sxy]-T);f=w[id];if(f<0)d-=f*(tp0[id+sxy]-T);
+        tp[id]=T+k*d;}}
+  }
+  // heat sources, then buoyancy (Boussinesq): warmer air than outside is pushed up by g*beta*(T-Tout)
+  function heat(){
+    if(!heatOn)return;
+    for(let n=0;n<sl.length;n++){const id=sl[n];tp[id]+=dt*Ts[id];}
+    const gb=dt*9.81*beta;
+    for(let n=0;n<fw.length;n++){const id=fw[n],a=flag[id],b=flag[id+sxy];
+      const T=a===0&&b===0?0.5*(tp[id]+tp[id+sxy]):a===0?tp[id]:tp[id+sxy];
+      w[id]+=gb*(T-Tout);}
+  }
+  function project(iters){
+    const h2=h*h,ih=1/h;
+    for(let n=0;n<fl.length;n++){const id=fl[n];div[id]=(u[id]-u[id-1]+v[id]-v[id-sx]+w[id]-w[id-sxy])*ih;}
+    for(let it=0;it<iters;it++){
+      for(let n=0;n<fl.length;n++){const id=fl[n];let s=0,m=0,q;
+        if(!fixU[id]){m++;q=id+1;s+=flag[q]===0?p[q]:pg[q];}
+        if(!fixU[id-1]){m++;q=id-1;s+=flag[q]===0?p[q]:pg[q];}
+        if(!fixV[id]){m++;q=id+sx;s+=flag[q]===0?p[q]:pg[q];}
+        if(!fixV[id-sx]){m++;q=id-sx;s+=flag[q]===0?p[q]:pg[q];}
+        if(!fixW[id]){m++;q=id+sxy;s+=flag[q]===0?p[q]:pg[q];}
+        if(!fixW[id-sxy]){m++;q=id-sxy;s+=flag[q]===0?p[q]:pg[q];}
+        if(m)p[id]+=OM*((s-h2*div[id])/m-p[id]);
+      }
+    }
+    const P=q=>flag[q]===0?p[q]:pg[q];   // outside air is at zero pressure, less the loss through the opening
+    for(let n=0;n<fu.length;n++){const id=fu[n];u[id]-=(P(id+1)-P(id))*ih;}
+    for(let n=0;n<fv.length;n++){const id=fv[n];v[id]-=(P(id+sx)-P(id))*ih;}
+    for(let n=0;n<fw.length;n++){const id=fw[n];w[id]-=(P(id+sxy)-P(id))*ih;}
+  }
+  // eddy viscosity. "room": zero-equation model for indoor air (Chen and Xu 1998), nu_t = 0.03874 * V * L,
+  // V = local speed, L = distance to the nearest wall. "smag": Smagorinsky, nu_t = (min(Cs*h, 0.41*L))^2 * |S|.
+  function eddy(){
+    const ih2=0.5/h;
+    for(let n=0;n<sl.length;n++){const id=sl[n];cu[id]=0.5*(u[id]+u[id-1]);cv[id]=0.5*(v[id]+v[id-sx]);cw[id]=0.5*(w[id]+w[id-sxy]);}
+    let mx=0;
+    for(let n=0;n<fl.length;n++){const id=fl[n];let nt;
+      if(sim.turb==="room"||sim.turb==="fan")nt=(sim.turb==="fan"?0.01:0.03874)*Math.hypot(cu[id],cv[id],cw[id])*wd[id];
+      else{
+        const a=(u[id]-u[id-1])/h,b=(v[id]-v[id-sx])/h,c_=(w[id]-w[id-sxy])/h;
+        const uy=(cu[id+sx]-cu[id-sx])*ih2,uz=(cu[id+sxy]-cu[id-sxy])*ih2,vx=(cv[id+1]-cv[id-1])*ih2,
+              vz=(cv[id+sxy]-cv[id-sxy])*ih2,wx=(cw[id+1]-cw[id-1])*ih2,wy=(cw[id+sx]-cw[id-sx])*ih2;
+        const S2=2*(a*a+b*b+c_*c_)+(uy+vx)**2+(uz+wx)**2+(vz+wy)**2,l=Math.min(0.17*h,0.41*wd[id]);
+        nt=l*l*Math.sqrt(S2);}
+      nt+=1.5e-5;nut[id]=nt;if(nt>mx)mx=nt;}
+    sim.nutMax=mx;
+  }
+  // implicit (backward Euler) diffusion, a few Gauss-Seidel sweeps, so large eddy viscosity stays stable
+  function diffFaces(f,list,st,sweeps){
+    const a0=dt/(h*h);u0.set(f);
+    for(let it=0;it<sweeps;it++)for(let n=0;n<list.length;n++){const id=list[n],a=a0*0.5*(nut[id]+nut[id+st]);
+      f[id]=(u0[id]+a*(f[id+1]+f[id-1]+f[id+sx]+f[id-sx]+f[id+sxy]+f[id-sxy]))/(1+6*a);}
+  }
+  function diffScalar(f,f0,sweeps){
+    const a0=dt/(h*h)/0.9;f0.set(f);   // turbulent Prandtl number 0.9
+    // face coefficient is the mean of the two cells, so what one cell loses its neighbour gains
+    for(let it=0;it<sweeps;it++)for(let n=0;n<fl.length;n++){const id=fl[n];let s=0,m=0;
+      for(const nb of [id+1,id-1,id+sx,id-sx,id+sxy,id-sxy]){const fb=flag[nb];if(fb===1)continue;
+        const a=a0*(fb===0?0.5*(nut[id]+nut[nb]):nut[id]);s+=a*f[nb];m+=a;}
+      f[id]=(f0[id]+s)/(1+m);}
+  }
+  function diffuse(){
+    if(sim.turb==="off")return;
+    eddy();diffFaces(u,fu,1,5);diffFaces(v,fv,sx,5);diffFaces(w,fw,sxy,5);diffScalar(c,c0,3);if(heatOn)diffScalar(tp,tp0,3);
+  }
+  // semi-Lagrangian advection does not conserve heat, so after each step the air temperature is shifted
+  // uniformly to match: heat before + sources + heat carried in and out through the openings
+  function energyIn(){
+    let e=0;const hd=dt/h;
+    for(let n=0;n<sl.length;n++)e+=Ts[sl[n]]*dt;
+    for(const [id,inn,ax,face,s] of outs){const vel=(ax===0?u:ax===1?v:w)[face],into=s?-vel:vel;e+=hd*into*(into>0?Tout:tp[inn]);}
+    for(let n=0;n<inG.length;n++){const id=inG[n];for(const [st,f] of [[1,u],[sx,v],[sxy,w]]){
+      if(flag[id+st]===0)e+=hd*f[id]*inT[n];if(id-st>=0&&flag[id-st]===0)e-=hd*f[id-st]*inT[n];}}
+    return e;
+  }
+  const sumT=()=>{let e=0;for(let n=0;n<sl.length;n++)e+=tp[sl[n]];return e;};
+  // an opening loses pressure like a sharp-edged orifice: discharge coefficient 0.6, loss K = 1/0.6^2 - 1.
+  // The ghost cell pressure resists the flow through it (p here is dt * pressure / density).
+  const KO=1/0.36-1;
+  function openingLoss(){
+    for(const [id,inn,ax,face,s] of outs){const vel=(ax===0?u:ax===1?v:w)[face],out=s?vel:-vel;
+      pg[id]=0.5*pg[id]+0.5*Math.sign(out)*dt*0.5*KO*out*out;}
+  }
+  function wallHeat(){
+    const a=dt*HW/(1.2*1005*h);let q=0;
+    for(let n=0;n<wallId.length;n++){const id=wallId[n],d=a*wallN[n]*(Tw-tp[id]);tp[id]+=d;q+=d;}
+    sim.qWall=q*1.2*1005*h*h*h/dt;   // W into the air from walls and furniture
+  }
+  // No global correction: every step only mixes neighbour values or adds source heat, so the air can never
+  // get colder than the coldest thing in the room. The energy error is only measured (sim.eErr, K/s per cell).
+  sim.step=function(iters){bc();let e0=0;if(heatOn){wallHeat();e0=sumT()+energyIn();}
+    advect();heat();diffuse();
+    if(heatOn&&sl.length)sim.eErr=(sumT()-e0)/sl.length/dt;
+    bc();openingLoss();project(iters||40);sim.time+=dt;};
+  sim.cvel=function(id,o){o[0]=0.5*(u[id]+u[id-1]);o[1]=0.5*(v[id]+v[id-sx]);o[2]=0.5*(w[id]+w[id-sxy]);return o;};
+  sim.speed=function(id){return Math.hypot(0.5*(u[id]+u[id-1]),0.5*(v[id]+v[id-sx]),0.5*(w[id]+w[id-sxy]));};
+  function targetCells(t){
+    const key=t.x+","+t.y+","+t.z;if(key===tzKey)return tz;
+    const a=[];let best=-1,bd=1e9;
+    for(let n=0;n<fl.length;n++){const id=fl[n],k=(id/sxy)|0,r=id-k*sxy,j=(r/sx)|0,i=r-j*sx;
+      const dx=(i-0.5)*h-t.x,dy=(j-0.5)*h-t.y,dz=(k-0.5)*h-t.z,d=dx*dx+dy*dy+dz*dz;
+      if(dx*dx+dy*dy<=0.16&&Math.abs(dz)<=0.35)a.push(id);if(d<bd){bd=d;best=id;}}
+    if(!a.length&&best>=0)a.push(best);
+    tz=Int32Array.from(a);tzKey=key;return tz;
+  }
+  sim.score=function(obj,t){
+    const list=obj==="stir"?occ:targetCells(t);let s=0;
+    if(obj==="cool"){   // minus the mean air temperature in your zone, so a higher score is still better
+      for(let n=0;n<list.length;n++)s+=tp[list[n]];return list.length?-s/list.length:0;}
+    for(let n=0;n<list.length;n++)s+=sim.speed(list[n]);
+    return list.length?s/list.length:0;
+  };
+  sim.stats=function(t){
+    let s=0,still=0,fr=0;for(let n=0;n<occ.length;n++){const id=occ[n],sp=sim.speed(id);s+=sp;if(sp<0.05)still++;fr+=1-c[id];}
+    const m=Math.max(1,occ.length),r={mean:s/m,still:still/m,fresh:fr/m,you:sim.score("breeze",t)};
+    if(heatOn){let ts=0,lo=1e9,hi=-1e9;for(let n=0;n<occ.length;n++)ts+=tp[occ[n]];
+      for(let n=0;n<fl.length;n++){const T=tp[fl[n]];if(T<lo)lo=T;if(T>hi)hi=T;}
+      const at=z=>{const i=Math.min(nx,Math.max(1,Math.round(t.x/h+0.5))),j=Math.min(ny,Math.max(1,Math.round(t.y/h+0.5))),k=Math.min(nz,Math.max(1,Math.round(z/h+0.5)));
+        let id=I(i,j,k);if(flag[id]===1)return NaN;return tp[id];};
+      const tl=targetCells(t);let ty=0;for(let n=0;n<tl.length;n++)ty+=tp[tl[n]];
+      r.tMean=ts/m;r.tYou=tl.length?ty/tl.length:NaN;r.tLo=lo;r.tHi=hi;r.dHead=at(1.1)-at(0.1);}
+    return r;
+  };
+  sim.build(scene);
+  return sim;
+}
+
+/* ---------- main-thread state ---------- */
+const view={mode:"plan",pos:{plan:1.1,long:1.25,cross:3.75},field:"speed",trace:true,tLo:25,tHi:30};
+if(matchMedia("(prefers-reduced-motion: reduce)").matches){view.trace=false;document.getElementById("trace").value="off";}
+let G=null,running=true,geomDirty=false,busy=false,opt=null;
+const $=id=>document.getElementById(id);
+function allocate(){G=makeSim(S,40,FACES);seedParticles();updateWarn();if(T){T.dirty=true;T.framed=false;T.parts=[];}}
+function rebuild(){G.build(S);updateWarn();}
+
+/* ---------- view geometry ---------- */
+let SP=null;
+const vkey=()=>view.mode==="corner"?"plan":view.mode;
+function spec(mode){
+  const g=G,m=mode||vkey(),dims=[g.nx,g.ny,g.nz];
+  const s=m==="plan"?{ha:0,va:1,fa:2}:m==="long"?{ha:0,va:2,fa:1}:{ha:1,va:2,fa:0};
+  s.nh=dims[s.ha];s.nv=dims[s.va];s.nf=dims[s.fa];
+  s.fi=Math.min(s.nf,Math.max(1,Math.round(view.pos[m]/g.h+0.5)));
+  s.at=(a,b)=>{const co=[0,0,0];co[s.ha]=a;co[s.va]=b;co[s.fa]=s.fi;return co[0]+g.sx*co[1]+g.sxy*co[2];};
+  return s;
+}
+const base=$("base"),topc=$("topc"),bctx=base.getContext("2d"),tctx=topc.getContext("2d");
+const off=document.createElement("canvas"),octx=off.getContext("2d");
+let P={x:0,y:0,w:1,h:1,cw:1,ch:1},dpr=1;
+function layout(){
+  SP=spec();
+  const M=16,avail=$("wrap").clientWidth-12,maxH=Math.max(240,Math.min(innerHeight*0.66,640)),ar=SP.nv/SP.nh;
+  let pw=avail-2*M,ph=pw*ar;
+  if(ph>maxH-2*M){ph=maxH-2*M;pw=ph/ar;}
+  pw=Math.max(80,pw);ph=Math.max(40,ph);
+  P={x:M,y:M,w:pw,h:ph,cw:pw+2*M,ch:ph+2*M};
+  dpr=Math.min(2,devicePixelRatio||1);
+  for(const c of [base,topc]){c.style.width=P.cw+"px";c.style.height=P.ch+"px";c.width=Math.round(P.cw*dpr);c.height=Math.round(P.ch*dpr);}
+  $("stack").style.width=P.cw+"px";
+  off.width=SP.nh;off.height=SP.nv;
+  topc.style.touchAction=view.mode==="plan"?"none":"pan-y";
+  $("stack").hidden=view.mode==="corner";$("three").hidden=view.mode!=="corner";
+  readTheme();
+}
+
+/* ---------- colors ---------- */
+const STOPS=[[0,"#0d1b2a"],[0.2,"#1b3a6b"],[0.42,"#1f7a8c"],[0.62,"#5fae78"],[0.8,"#e0b040"],[1,"#d9562b"]];
+const LUT=new Uint8ClampedArray(256*3);
+(function(){const hx=s=>[1,3,5].map(i=>parseInt(s.slice(i,i+2),16));
+  for(let n=0;n<256;n++){const t=n/255;let k=0;while(k<STOPS.length-2&&t>STOPS[k+1][0])k++;
+    const [t0,c0]=STOPS[k],[t1,c1]=STOPS[k+1],f=(t-t0)/(t1-t0),A=hx(c0),B=hx(c1);
+    for(let i=0;i<3;i++)LUT[n*3+i]=A[i]+(B[i]-A[i])*f;}
+  const lg=$("leg").getContext("2d");
+  for(let x=0;x<150;x++){const n=Math.round(x/149*255);lg.fillStyle=`rgb(${LUT[n*3]},${LUT[n*3+1]},${LUT[n*3+2]})`;lg.fillRect(x,0,1,10);}
+})();
+const lut=t=>{const n=Math.max(0,Math.min(255,Math.round(t*255)))*3;return `rgb(${LUT[n]},${LUT[n+1]},${LUT[n+2]})`;};
+let TH={};
+function readTheme(){const cs=getComputedStyle(document.documentElement);
+  for(const k of ["solid","supply","open"])TH[k]=cs.getPropertyValue("--"+k).trim();
+  TH.font=getComputedStyle(document.body).fontFamily;}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",readTheme);
+new MutationObserver(readTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+function vscale(){return Math.min(2,Math.max(0.5,G.vmax*0.5));}
+
+/* ---------- drawing ---------- */
+const mx=m=>P.x+m/(SP.nh*G.h)*P.w, my=m=>P.y+P.h-m/(SP.nv*G.h)*P.h;
+const COMPASS=["east","north-east","north","north-west","west","south-west","south","south-east"];
+const bearing=a=>COMPASS[Math.round((((a%360)+360)%360)/45)%8];
+function arrow(ctx,x,y,ang,len){
+  const ex=x+Math.cos(ang)*len,ey=y-Math.sin(ang)*len;
+  ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ex,ey);
+  ctx.moveTo(ex,ey);ctx.lineTo(ex-Math.cos(ang-0.5)*6,ey+Math.sin(ang-0.5)*6);
+  ctx.moveTo(ex,ey);ctx.lineTo(ex-Math.cos(ang+0.5)*6,ey+Math.sin(ang+0.5)*6);ctx.stroke();
+}
+function fillImage(s,cx,solidAlpha){
+  const g=G,img=cx.createImageData(s.nh,s.nv),d=img.data,flag=g.flag,c=g.c;
+  const vs=vscale(),fresh=view.field==="fresh",temp=view.field==="temp"&&g.heatOn,tp=g.tp,t0=view.tLo,tk=1/Math.max(0.5,view.tHi-view.tLo);
+  for(let b=1;b<=s.nv;b++)for(let a=1;a<=s.nh;a++){
+    const id=s.at(a,b),o=((s.nv-b)*s.nh+(a-1))*4;
+    const t=flag[id]===1?0:fresh?1-c[id]:temp?(tp[id]-t0)*tk:g.speed(id)/vs;
+    const n=Math.max(0,Math.min(255,Math.round(t*255)))*3;
+    d[o]=LUT[n];d[o+1]=LUT[n+1];d[o+2]=LUT[n+2];d[o+3]=flag[id]===1?solidAlpha:255;
+  }
+  cx.putImageData(img,0,0);
+}
+function drawBase(){
+  const g=G,s=SP,flag=g.flag;
+  fillImage(s,octx,255);
+  const ctx=bctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,P.cw,P.ch);
+  ctx.imageSmoothingEnabled=true;ctx.drawImage(off,P.x,P.y,P.w,P.h);
+  const cw=P.w/s.nh,ch=P.h/s.nv;
+  ctx.fillStyle=TH.solid;
+  for(let b=1;b<=s.nv;b++)for(let a=1;a<=s.nh;a++)if(flag[s.at(a,b)]===1)ctx.fillRect(P.x+(a-1)*cw,P.y+P.h-b*ch,cw+0.6,ch+0.6);
+  ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=1;ctx.strokeRect(P.x-.5,P.y-.5,P.w+1,P.h+1);
+  const sp=(s.fi-0.5)*g.h;
+  ctx.font="500 11px "+TH.font;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle="rgba(255,255,255,.92)";
+  const labels=[];
+  // every box is drawn, drafting style: cut by the slice = solid gray with a bold edge;
+  // beyond the slice (below in plan, behind in a section) = tinted with a thin edge;
+  // between you and the slice (above in plan, in front in a section) = dashed outline only
+  for(const bx of S.boxes){
+    const lo=[bx.x,bx.y,bx.z],sz=[bx.dx,bx.dy,bx.dz],a0=lo[s.fa],a1=a0+sz[s.fa];
+    const X0=mx(lo[s.ha]),X1=mx(lo[s.ha]+sz[s.ha]),Y0=my(lo[s.va]),Y1=my(lo[s.va]+sz[s.va]);
+    const cut=sp>=a0&&sp<=a1;
+    const beyond=view.mode==="plan"?a1<sp:view.mode==="long"?a0>sp:a1<sp;
+    ctx.setLineDash(cut||beyond?[]:[5,4]);
+    if(!cut&&beyond){ctx.fillStyle="rgba(190,205,212,.22)";ctx.fillRect(X0,Y1,X1-X0,Y0-Y1);}
+    ctx.strokeStyle=cut?"rgba(255,255,255,.95)":"rgba(225,235,240,.75)";ctx.lineWidth=cut?2:1.2;
+    ctx.strokeRect(X0,Y1,X1-X0,Y0-Y1);ctx.setLineDash([]);
+    const tag=cut?bx.name:view.mode==="plan"?`${bx.name}, ${num(bx.z+bx.dz)} m high`:bx.name;
+    ctx.font=(cut?"600 ":"500 ")+"11px "+TH.font;ctx.fillStyle=cut?"#ffffff":"rgba(235,242,245,.9)";
+    const tw=ctx.measureText(tag).width,lx=(X0+X1)/2;
+    let ly=X1-X0>tw+6&&Y0-Y1>14?(Y0+Y1)/2:Math.max(P.y+7,Y1-8);
+    for(let n=0;n<6&&labels.some(q=>Math.abs(q.y-ly)<13&&Math.abs(q.x-lx)<(q.w+tw)/2+4);n++)ly-=13;   // keep labels apart
+    labels.push({x:lx,y:ly,w:tw});ctx.fillText(tag,lx,ly);
+  }
+  ctx.font="500 11px "+TH.font;ctx.fillStyle="rgba(255,255,255,.92)";
+  // openings: bars on the edges they sit on, dashed outlines when they lie on the wall behind the slice
+  for(const o of S.openings){
+    const f=FACES[o.face],col=o.kind==="supply"?TH.supply:TH.open;
+    const ext=ax=>ax===f.ua?[o.u-o.wu/2,o.u+o.wu/2]:[o.v-o.wv/2,o.v+o.wv/2];
+    ctx.strokeStyle=col;ctx.fillStyle=col;
+    if(f.n===s.fa){
+      const [h0,h1]=ext(s.ha),[v0,v1]=ext(s.va);
+      ctx.setLineDash([4,3]);ctx.lineWidth=1.5;ctx.strokeRect(mx(h0),my(v1),mx(h1)-mx(h0),my(v0)-my(v1));ctx.setLineDash([]);continue;
+    }
+    const [c0,c1]=ext(s.fa);ctx.globalAlpha=(sp>=c0&&sp<=c1)?1:.35;
+    if(f.n===s.ha){const [v0,v1]=ext(s.va),X=f.s?P.x+P.w+3:P.x-9;ctx.fillRect(X,my(v1),6,Math.max(3,my(v0)-my(v1)));}
+    else{const [h0,h1]=ext(s.ha),Y=f.s?P.y-9:P.y+P.h+3;ctx.fillRect(mx(h0),Y,Math.max(3,mx(h1)-mx(h0)),6);}
+    ctx.globalAlpha=1;
+  }
+  const pxm=P.w/(s.nh*g.h);
+  if(view.mode==="plan"){
+    // optimizer results: one dot per spot, colored by its best score, arrow for its best direction
+    if(opt&&opt.spots){
+      const top=opt.maxScore||1,lo=opt.obj==="cool"||opt.obj==="feels"?opt.minScore:0,span=Math.max(1e-6,top-lo);
+      for(const sp_ of opt.spots){if(sp_.best==null)continue;
+        const X=mx(sp_.x),Y=my(sp_.y);ctx.fillStyle=lut(opt.obj==="cool"||opt.obj==="feels"?1-(sp_.best-lo)/span:sp_.best/top);   // cool: blue = cooler air at youctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(X,Y,5,0,7);ctx.fill();ctx.stroke();
+        ctx.lineWidth=1.2;arrow(ctx,X,Y,sp_.ang*Math.PI/180,12);}
+      if(opt.best){const X=mx(opt.best.x),Y=my(opt.best.y);ctx.strokeStyle="#ffd166";ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(X,Y,11,0,7);ctx.stroke();}
+    }
+    // fans
+    for(const f of S.fans){const X=mx(f.x),Y=my(f.y),an=f.angle*Math.PI/180,r=Math.max(5,f.d/2*pxm);
+      ctx.strokeStyle="#ffffff";ctx.lineWidth=3;ctx.beginPath();
+      ctx.moveTo(X-Math.sin(an)*r,Y-Math.cos(an)*r);ctx.lineTo(X+Math.sin(an)*r,Y+Math.cos(an)*r);ctx.stroke();
+      ctx.lineWidth=1.5;arrow(ctx,X,Y,an,Math.max(18,0.6*pxm));
+      ctx.fillStyle="#ffffff";ctx.textBaseline="top";ctx.fillText(f.name,X,Y+r+4);ctx.textBaseline="middle";}
+    // you
+    const t=S.target,X=mx(t.x),Y=my(t.y);
+    ctx.strokeStyle="#ffd166";ctx.fillStyle="#ffd166";ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.arc(X,Y,0.4*pxm,0,7);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(X,Y,3,0,7);ctx.fill();ctx.font="600 11px "+TH.font;ctx.fillText("You",X,Y-0.4*pxm-8);
+  }else{
+    const t=S.target,tc=[t.x,t.y,t.z];
+    if(Math.abs(sp-tc[s.fa])<=0.4){ctx.strokeStyle="#ffd166";ctx.lineWidth=1.5;ctx.setLineDash([3,3]);
+      const hz=s.va===2?0.35:0.4;ctx.strokeRect(mx(tc[s.ha]-0.4),my(tc[s.va]+hz),0.8*pxm,2*hz*pxm);ctx.setLineDash([]);
+      ctx.fillStyle="#ffd166";ctx.font="600 11px "+TH.font;ctx.fillText("You",mx(tc[s.ha]),my(tc[s.va]+hz)-8);}
+    // fans seen from the side: stand, head disk, motor, and the blowing direction
+    for(const f of S.fans){
+      const an=f.angle*Math.PI/180,dir=[Math.cos(an),Math.sin(an),0],perp=[-Math.sin(an),Math.cos(an),0],fc=[f.x,f.y,f.z];
+      const near=Math.abs(sp-fc[s.fa])<=Math.max(0.6,f.d);
+      ctx.globalAlpha=near?1:0.4;ctx.strokeStyle="#ffffff";ctx.fillStyle="#ffffff";
+      const X=mx(fc[s.ha]),Yh=my(f.z),Y0=my(0),r=Math.max(4,f.d/2*pxm),dh=dir[s.ha];
+      ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(X,Y0);ctx.lineTo(X,Yh+r*0.3);ctx.stroke();
+      ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(X-0.17*pxm,Y0-1.5);ctx.lineTo(X+0.17*pxm,Y0-1.5);ctx.stroke();
+      ctx.fillRect(X-dh*0.11*pxm-4,Yh-4,8,8);
+      const rx=Math.max(2.5,r*Math.abs(perp[s.ha]));
+      ctx.fillStyle="rgba(255,255,255,.18)";ctx.lineWidth=1.8;ctx.beginPath();ctx.ellipse(X,Yh,rx,r,0,0,7);ctx.fill();ctx.stroke();
+      ctx.fillStyle="#ffffff";
+      if(Math.abs(dh)>0.3){ctx.lineWidth=1.8;arrow(ctx,X+Math.sign(dh)*(rx+2),Yh,dh>0?0:Math.PI,Math.max(16,0.55*pxm*Math.abs(dh)));}
+      else{ // blowing toward or away from the viewer
+        const away=view.mode==="long"?dir[1]>0:dir[0]<0;ctx.lineWidth=1.5;
+        if(away){const q=Math.min(rx,r)*0.5+3;ctx.beginPath();ctx.moveTo(X-q,Yh-q);ctx.lineTo(X+q,Yh+q);ctx.moveTo(X+q,Yh-q);ctx.lineTo(X-q,Yh+q);ctx.stroke();}
+        else{ctx.beginPath();ctx.arc(X,Yh,3,0,7);ctx.fill();}
+      }
+      ctx.font="500 11px "+TH.font;ctx.fillText(f.name,X,Yh-r-9);
+      ctx.globalAlpha=1;
+    }
+  }
+}
+
+/* ---------- flow traces ---------- */
+let parts=[];const tmp=[0,0,0];
+function seedParticles(){parts=[];for(let n=0;n<650;n++)parts.push(spawn({}));}
+function spawn(p){const s=spec();p.a=0.5+Math.random()*s.nh;p.b=0.5+Math.random()*s.nv;p.life=40+Math.random()*80;return p;}
+function inplane(a,b){
+  const s=SP,a0=Math.floor(a),b0=Math.floor(b),fa=a-a0,fb=b-b0;let h_=0,v_=0;
+  const add=(id,q)=>{G.cvel(id,tmp);h_+=q*tmp[s.ha];v_+=q*tmp[s.va];};
+  add(s.at(a0,b0),(1-fa)*(1-fb));add(s.at(a0+1,b0),fa*(1-fb));add(s.at(a0,b0+1),(1-fa)*fb);add(s.at(a0+1,b0+1),fa*fb);
+  return [h_,v_];
+}
+function drawParticles(){
+  const ctx=tctx;ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.globalCompositeOperation="destination-out";ctx.fillStyle="rgba(0,0,0,.14)";ctx.fillRect(0,0,P.cw,P.ch);
+  ctx.globalCompositeOperation="source-over";
+  if(!view.trace)return;
+  const s=SP,cw=P.w/s.nh,ch=P.h/s.nv,k=0.06/G.h;
+  ctx.strokeStyle="rgba(255,255,255,.8)";ctx.lineWidth=1.2;ctx.beginPath();
+  for(const p of parts){
+    if(p.life--<=0||p.a<0.5||p.a>s.nh+0.5||p.b<0.5||p.b>s.nv+0.5||G.flag[s.at(Math.round(p.a),Math.round(p.b))]===1){spawn(p);continue;}
+    const [vh,vv]=inplane(Math.min(Math.max(p.a,0.5),s.nh+0.49),Math.min(Math.max(p.b,0.5),s.nv+0.49));
+    const x0=P.x+(p.a-0.5)*cw,y0=P.y+P.h-(p.b-0.5)*ch;
+    p.a+=vh*k;p.b+=vv*k;
+    ctx.moveTo(x0,y0);ctx.lineTo(P.x+(p.a-0.5)*cw,P.y+P.h-(p.b-0.5)*ch);
+  }
+  ctx.stroke();
+}
+
+/* ---------- stats ---------- */
+function updateStats(){
+  const st=G.stats(S.target),t=G.time;
+  $("sYou").textContent=st.you.toFixed(2);
+  $("sSpd").textContent=st.mean.toFixed(2);
+  $("sStill").textContent=Math.round(st.still*100)+"%";
+  $("sFresh").textContent=Math.round(st.fresh*100)+"%";
+  if(G.heatOn){$("sTy").textContent=st.tYou.toFixed(1)+" °C";$("sTm").textContent=`room mean ${st.tMean.toFixed(1)} °C`;
+    $("sDT").textContent=(isNaN(st.dHead)?"–":(st.dHead>=0?"+":"")+st.dHead.toFixed(1)+" K");
+    // color range follows the field, with whole degrees and at least 2 K span so it does not flicker
+    const lo=Math.floor(Math.min(st.tLo,S.heat.Tout)),hi=Math.max(lo+2,Math.ceil(st.tHi));
+    if(lo!==view.tLo||hi!==view.tHi){view.tLo=lo;view.tHi=hi;syncLegend();}}
+  else{$("sTy").textContent="–";$("sTm").textContent="heat is off";$("sDT").textContent="–";}
+  {const ta=G.heatOn?st.tYou:S.heat.Tin,ce=coolingEffect(ta,st.you,COMFORT.rh,COMFORT.met,COMFORT.clo);
+    $("sFeel").textContent=(ta-ce).toFixed(1)+" °C";$("sCE").textContent=`${ce.toFixed(1)} K cooler than the air`;}
+  $("sTime").textContent=t<120?t.toFixed(0)+" s":(t/60).toFixed(1)+" min";
+  $("sGrid").textContent=`${G.nx}×${G.ny}×${G.nz} cells, ${(G.h*100).toFixed(0)} cm`;
+}
+function updateWarn(){
+  let m="";
+  if(!G.hasFan&&!G.hasSup)m="Nothing moves the air. Add a fan or a vent.";
+  else if(G.hasSup&&!G.hasOut)m="A vent pushes air in, but the room has no opening for it to leave. Add an opening.";
+  $("warn").textContent=m;$("warn").hidden=!m;
+}
+
+/* ---------- side panel ---------- */
+const num=v=>Math.round(v*100)/100,esc=s=>String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+const inp=(id,lab,key,val,attrs="")=>`<label class="f">${lab}<input id="${id}" type="number" ${attrs} data-k="${key}" value="${num(val)}"></label>`;
+function renderLists(){
+  $("rL").value=S.room.L;$("rW").value=S.room.W;$("rH").value=S.room.H;
+  $("tx").value=num(S.target.x);$("ty").value=num(S.target.y);$("tz").value=num(S.target.z);
+  $("hOn").value=S.heat.on?"on":"off";$("hq").value=num(S.target.q||0);$("hTin").value=num(S.heat.Tin);$("hTout").value=num(S.heat.Tout);$("hTw").value=num(S.heat.Twall);
+  $("fans").innerHTML=S.fans.map((f,i)=>`<div class="item" data-list="fans" data-i="${i}">
+    <div class="itemhead"><span class="dot" style="background:var(--ink)"></span><input id="fn${i}" data-k="name" value="${esc(f.name)}" aria-label="Fan name"><button class="x" data-del="fans" aria-label="Remove ${esc(f.name)}">×</button></div>
+    <div class="grid3">${inp("f"+i+"x","x (m)","x",f.x,'step="0.1"')}${inp("f"+i+"y","y (m)","y",f.y,'step="0.1"')}${inp("f"+i+"z","Hub height (m)","z",f.z,'step="0.1"')}
+    ${inp("f"+i+"a","Direction (°)","angle",f.angle,'step="15"')}${inp("f"+i+"d","Diameter (m)","d",f.d,'step="0.05" min="0.1"')}${inp("f"+i+"s","Air speed (m/s)","speed",f.speed,'step="0.5" min="0.5" max="10"')}</div></div>`).join("")||'<p class="note">No fans yet.</p>';
+  $("ofan").innerHTML=S.fans.map((f,i)=>`<option value="${i}">${esc(f.name)}</option>`).join("");
+  $("boxes").innerHTML=S.boxes.map((b,i)=>`<div class="item" data-list="boxes" data-i="${i}">
+    <div class="itemhead"><span class="dot" style="background:var(--solid)"></span><input id="bn${i}" data-k="name" value="${esc(b.name)}" aria-label="Box name"><button class="x" data-del="boxes" aria-label="Remove ${esc(b.name)}">×</button></div>
+    <div class="grid3">${["x","y","z","dx","dy","dz"].map((k,n)=>inp("b"+i+k,["x","y","z","Size x","Size y","Size z"][n]+" (m)",k,b[k],'step="0.05" min="0"')).join("")}${inp("b"+i+"q","Heat (W)","q",b.q||0,'step="10" min="0" max="5000"')}</div></div>`).join("")||'<p class="note">No boxes yet.</p>';
+  $("opens").innerHTML=S.openings.map((o,i)=>{const f=FACES[o.face],a=AX[f.ua],b=AX[f.va];
+    return `<div class="item" data-list="openings" data-i="${i}">
+    <div class="itemhead"><span class="dot" style="background:var(${o.kind==="supply"?"--supply":"--open"})"></span>
+      <select id="ok${i}" data-k="kind" aria-label="Type"><option value="open"${o.kind==="open"?" selected":""}>Opening</option><option value="supply"${o.kind==="supply"?" selected":""}>Vent</option></select>
+      <select id="of${i}" data-k="face" aria-label="Surface">${Object.entries(FACES).map(([k,v])=>`<option value="${k}"${k===o.face?" selected":""}>${v.name}</option>`).join("")}</select>
+      <button class="x" data-del="openings" aria-label="Remove opening">×</button></div>
+    <div class="grid3">${inp("o"+i+"u","Center "+a+" (m)","u",o.u,'step="0.05"')}${inp("o"+i+"v","Center "+b+" (m)","v",o.v,'step="0.05"')}
+      ${o.kind==="supply"?inp("o"+i+"s","Speed (m/s)","speed",o.speed,'step="0.1" min="0.1" max="8"'):"<span></span>"}
+      ${inp("o"+i+"wu","Size "+a+" (m)","wu",o.wu,'step="0.05" min="0.05"')}${inp("o"+i+"wv","Size "+b+" (m)","wv",o.wv,'step="0.05" min="0.05"')}
+      ${o.kind==="supply"?inp("o"+i+"t","Supply temp (°C)","temp",o.temp==null?S.heat.Tout:o.temp,'step="0.5" min="-10" max="50"'):""}</div></div>`;}).join("")||'<p class="note">No openings. The room is sealed.</p>';
+}
+function sceneChanged(){geomDirty=true;if(T)T.dirty=true;if(opt&&!busy){opt.spots=null;opt.best=null;$("apply").hidden=true;}}
+const aside=document.querySelector("aside");
+aside.addEventListener("change",e=>{
+  const t=e.target,k=t.dataset.k;
+  if(t.id==="rL"||t.id==="rW"||t.id==="rH"){
+    const v=parseFloat(t.value);if(!(v>0))return;
+    S.room[{rL:"L",rW:"W",rH:"H"}[t.id]]=Math.min(30,Math.max(t.id==="rH"?1.5:1,v));
+    clampScene();allocate();layout();syncSlice();renderLists();sceneChanged();return;
+  }
+  if(t.id==="hOn"){S.heat.on=t.value==="on";sceneChanged();return;}
+  if(t.id==="hq"){S.target.q=Math.max(0,parseFloat(t.value)||0);sceneChanged();return;}
+  if(t.id==="hTout"){const v=parseFloat(t.value);if(!isNaN(v))S.heat.Tout=Math.min(50,Math.max(-10,v));sceneChanged();return;}
+  if(t.id==="hTw"){const v=parseFloat(t.value);if(!isNaN(v))S.heat.Twall=Math.min(50,Math.max(-10,v));sceneChanged();return;}
+  if(t.id==="hTin"){const v=parseFloat(t.value);if(!isNaN(v))S.heat.Tin=Math.min(50,Math.max(-10,v));allocate();layout();syncSlice();return;}
+  if(t.id==="tx"||t.id==="ty"||t.id==="tz"){S.target[t.id[1]]=parseFloat(t.value)||0;clampScene();sceneChanged();return;}
+  const item=t.closest(".item");if(!item||!k)return;
+  const o=S[item.dataset.list][+item.dataset.i];
+  if(k==="name"||k==="kind"||k==="face"){o[k]=t.value;if(k==="kind"&&o.kind==="supply"&&!o.speed)o.speed=1.5;if(k!=="name")renderLists();}
+  else if(k==="temp"){const v=parseFloat(t.value);if(!isNaN(v))o.temp=Math.min(50,Math.max(-10,v));}
+  else o[k]=k==="angle"?(parseFloat(t.value)||0):Math.max(0,parseFloat(t.value)||0);
+  sceneChanged();
+});
+aside.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;
+  const R=S.room;
+  if(t.dataset.del){const item=t.closest(".item");S[t.dataset.del].splice(+item.dataset.i,1);}
+  else if(t.id==="addBox")S.boxes.push({name:"Box "+(S.boxes.length+1),x:R.L/2-0.3,y:R.W/2-0.3,z:0,dx:0.6,dy:0.6,dz:1.0,q:0});
+  else if(t.id==="addFan")S.fans.push({name:"Fan "+(S.fans.length+1),x:R.L/2,y:R.W/2,z:1.0,angle:0,d:0.4,speed:3});
+  else if(t.id==="addSup")S.openings.push({kind:"supply",face:"ceiling",u:R.L/2,v:R.W/2,wu:0.6,wv:0.6,speed:1.5});
+  else if(t.id==="addOpen")S.openings.push({kind:"open",face:"S",u:R.L/2,v:1.0,wu:0.9,wv:2.0,speed:0});
+  else return;
+  renderLists();sceneChanged();
+});
+function clampScene(){const R=S.room,t=S.target;
+  t.x=Math.min(R.L,Math.max(0,t.x));t.y=Math.min(R.W,Math.max(0,t.y));t.z=Math.min(R.H,Math.max(0.2,t.z));
+  for(const f of S.fans){f.x=Math.min(R.L,f.x);f.y=Math.min(R.W,f.y);f.z=Math.min(R.H,f.z);}}
+
+const TURBNOTE={
+  fan:"Chen and Xu formula with the factor cut from 0.03874 to 0.01, tuned to 4 measured home fans (Buildings 2025). Fan jet decay: RMS error 0.06 of the speed at 0.5 m. Annex 20 test room: RMS error 0.16 of the supply speed, close to Off (0.15).",
+  room:"Eddy viscosity = 0.03874 × local speed × distance to the nearest wall. Annex 20 test room, 106 measured points: RMS error 0.27 of the supply speed. The ceiling jet dies far too early.",
+  smag:"Eddy viscosity from the local shear and the grid size. Annex 20 test room, 106 measured points: RMS error 0.20 of the supply speed. The return flow along the floor is too weak.",
+  off:"No turbulence model. Annex 20 test room, 106 measured points: RMS error 0.13 of the supply speed, the best of the three. Weak point: a free fan jet barely slows down, so the breeze far from a fan is too strong."};
+function syncTurb(){$("turb").value=S.turb;$("turbnote").textContent=TURBNOTE[S.turb];}
+$("turb").addEventListener("change",e=>{S.turb=e.target.value;G.turb=S.turb;syncTurb();sceneChanged();});
+/* ---------- toolbar ---------- */
+function syncSlice(){
+  SP=spec();
+  const key=vkey(),size={plan:S.room.H,long:S.room.W,cross:S.room.L}[key],ax={plan:"z",long:"y",cross:"x"}[key];
+  const r=$("pos");r.max=size;r.value=view.pos[key];
+  const sp=((SP.fi-0.5)*G.h).toFixed(2);
+  $("poslab").textContent=`${ax} ${sp} m`;
+  $("key").hidden=view.mode==="corner";
+  $("cap").textContent=view.mode==="corner"?`Corner view from the south-east. Drag to turn, scroll or pinch to zoom. The colored plane is the plan slice at z = ${sp} m.`:view.mode==="plan"?`Plan at z = ${sp} m. North is up. Drag fans, boxes and "You" to move them.`:
+    view.mode==="long"?`Section at y = ${sp} m, looking north. Floor at the bottom.`:`Section at x = ${sp} m, looking west. Floor at the bottom.`;
+}
+document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{
+  view.mode=b.dataset.mode;document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  if(view.mode==="corner"){initThree();if(T)T.dirty=true;}
+  layout();syncSlice();seedParticles();tctx.clearRect(0,0,topc.width,topc.height);
+}));
+$("pos").addEventListener("input",e=>{view.pos[vkey()]=parseFloat(e.target.value);syncSlice();});
+$("field").addEventListener("change",e=>{view.field=e.target.value;syncLegend();});
+$("trace").addEventListener("change",e=>{view.trace=e.target.value==="on";});
+$("run").addEventListener("click",()=>{running=!running;$("run").textContent=running?"Pause":"Run";});
+$("reset").addEventListener("click",()=>{allocate();layout();syncSlice();});
+function syncLegend(){
+  if(view.field==="fresh"){$("lmin").textContent="room air";$("lmax").textContent="outside air";}
+  else if(view.field==="temp"){$("lmin").textContent=G.heatOn?view.tLo+" °C":"heat off";$("lmax").textContent=G.heatOn?view.tHi+" °C":"";}
+  else{$("lmin").textContent="0";$("lmax").textContent=vscale().toFixed(1)+" m/s";}
+}
+addEventListener("resize",()=>{layout();});
+
+/* ---------- drag on the plan ---------- */
+let drag=null;
+function toMeters(e){const r=topc.getBoundingClientRect();
+  return [(e.clientX-r.left-P.x)/P.w*SP.nh*G.h,(P.y+P.h-(e.clientY-r.top))/P.h*SP.nv*G.h];}
+function hit(m){
+  const d2=(x,y)=>(m[0]-x)**2+(m[1]-y)**2;
+  if(d2(S.target.x,S.target.y)<0.3**2)return {o:S.target,w:0,d:0};
+  for(const f of S.fans)if(d2(f.x,f.y)<Math.max(0.3,f.d/2+0.1)**2)return {o:f,w:0,d:0};
+  for(let i=S.boxes.length-1;i>=0;i--){const b=S.boxes[i];if(m[0]>=b.x&&m[0]<=b.x+b.dx&&m[1]>=b.y&&m[1]<=b.y+b.dy)return {o:b,w:b.dx,d:b.dy};}
+  return null;
+}
+topc.addEventListener("pointerdown",e=>{if(view.mode!=="plan"||busy)return;const m=toMeters(e),hh=hit(m);if(!hh)return;
+  drag={...hh,ox:m[0]-hh.o.x,oy:m[1]-hh.o.y};topc.setPointerCapture(e.pointerId);e.preventDefault();});
+topc.addEventListener("pointermove",e=>{
+  if(view.mode!=="plan"){topc.style.cursor="default";return;}
+  const m=toMeters(e);
+  if(!drag){topc.style.cursor=!busy&&hit(m)?"grab":"default";return;}
+  const o=drag.o;topc.style.cursor="grabbing";
+  o.x=Math.min(S.room.L-drag.w,Math.max(0,m[0]-drag.ox));o.y=Math.min(S.room.W-drag.d,Math.max(0,m[1]-drag.oy));sceneChanged();});
+const endDrag=()=>{if(drag){drag=null;renderLists();}};
+topc.addEventListener("pointerup",endDrag);topc.addEventListener("pointercancel",endDrag);
+
+/* ---------- optimizer: brute-force search in Web Workers ---------- */
+const workerSrc=`const makeSim=${makeSim.toString()};
+${setTemp.toString()}
+${coolingEffect.toString()}
+const COMFORT=${JSON.stringify(COMFORT)};
+${feelsLike.toString()}
+onmessage=e=>{const m=e.data;
+  for(const [k,cd] of m.jobs){const sc=JSON.parse(JSON.stringify(m.scene));Object.assign(sc.fans[m.fan],{x:cd.x,y:cd.y,angle:cd.angle});
+    const s=makeSim(sc,m.res,m.FACES),feels=m.obj==="feels";let acc=0,av=0,n=0;
+    for(let t=0;t<m.steps;t++){s.step(m.iters);if(t>=m.steps-m.avg){
+      if(feels){acc+=s.heatOn?-s.score("cool",sc.target):sc.heat.Tin;av+=s.score("breeze",sc.target);}else acc+=s.score(m.obj,sc.target);n++;}}
+    // feels: score is minus the feels-like temperature, so a higher score is still better
+    postMessage({k,score:feels?-feelsLike(acc/n,av/n):acc/n,time:s.time,air:acc/n,v:av/n});}
+  postMessage({done:true});};`;
+let workerURL=null;
+function runPool(cands,cfg,onResult){
+  return new Promise((resolve,reject)=>{
+    try{workerURL=workerURL||URL.createObjectURL(new Blob([workerSrc],{type:"text/javascript"}));}catch(err){reject(err);return;}
+    const nW=Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1,cands.length));
+    let left=nW;const ws=[];
+    for(let q=0;q<nW;q++){
+      let wk;try{wk=new Worker(workerURL);}catch(err){reject(err);return;}
+      ws.push(wk);
+      wk.onmessage=e=>{if(e.data.done){wk.terminate();if(--left===0)resolve();}else onResult(e.data.k,e.data.score,e.data.time,e.data);};
+      wk.onerror=err=>{ws.forEach(x=>x.terminate());reject(err);};
+      wk.postMessage({...cfg,scene:JSON.parse(JSON.stringify(S)),FACES,jobs:cands.map((c,k)=>[k,c]).filter((_,k)=>k%nW===q)});
+    }
+  });
+}
+function candidates(obj,fan){
+  const R=S.room,step=Math.max(0.45,Math.min(R.L,R.W)/6),pts=[];
+  for(let x=step/2;x<R.L;x+=step)for(let y=step/2;y<R.W;y+=step){
+    const inBox=S.boxes.some(b=>fan.z>=b.z-0.1&&fan.z<=b.z+b.dz+0.1&&x>b.x-0.2&&x<b.x+b.dx+0.2&&y>b.y-0.2&&y<b.y+b.dy+0.2);
+    if(inBox)continue;
+    const dx=S.target.x-x,dy=S.target.y-y;
+    if(obj!=="stir"&&dx*dx+dy*dy<0.6*0.6)continue;   // a fan in your lap does not count
+    pts.push({x,y,toT:Math.atan2(dy,dx)*180/Math.PI});
+  }
+  const spots=pts.map(p=>({x:p.x,y:p.y,best:null,ang:0})),cands=[];
+  pts.forEach((p,si)=>{for(let a=0;a<360;a+=45){
+    if(obj==="breeze"){const d=Math.abs(((a-p.toT)%360+540)%360-180);if(d>100)continue;}
+    cands.push({x:p.x,y:p.y,angle:a,si});}});
+  return {spots,cands};
+}
+$("go").addEventListener("click",async()=>{
+  if(busy)return;
+  if(!S.fans.length){$("res").textContent="Add a fan first. The optimizer moves one fan around the room.";return;}
+  const obj=$("obj").value,fi=Math.min(+$("ofan").value||0,S.fans.length-1),fan=S.fans[fi];
+  if(obj==="cool"&&!(S.heat.on&&(S.target.q>0||S.boxes.some(b=>b.q>0)||S.heat.Tout!==S.heat.Tin||S.openings.some(o=>o.kind==="supply"&&o.temp!=null&&o.temp!==S.heat.Tin)))){
+    $("res").textContent="Turn heat on and give the room a heat source or a temperature difference first. Without them the air is the same temperature everywhere.";return;}
+  const {spots,cands}=candidates(obj,fan);
+  if(!cands.length){$("res").textContent="No free floor spots to try. Make the room bigger or remove a box.";return;}
+  busy=true;$("go").disabled=true;$("apply").hidden=true;$("bar").hidden=false;
+  opt={spots,best:null,maxScore:-Infinity,minScore:Infinity,fi,obj};
+  const total=cands.length+7;let done=0;
+  const prog=()=>{$("bar").firstElementChild.style.width=(100*done/total).toFixed(1)+"%";};prog();
+  $("res").textContent=`Trying ${cands.length} spots and directions on a coarse grid…`;
+  try{
+    const cool=obj==="cool"||obj==="feels";   // heat needs a longer run than the breeze to build up
+    await runPool(cands,{res:22,steps:cool?140:70,iters:30,avg:cool?40:20,obj,fan:fi},(k,score)=>{
+      const c=cands[k];c.score=score;const sp=spots[c.si];
+      if(sp.best==null||score>sp.best){sp.best=score;sp.ang=c.angle;}
+      opt.maxScore=Math.max(opt.maxScore,score);opt.minScore=Math.min(opt.minScore,score);done++;prog();});
+    const top=cands.slice().sort((a,b)=>b.score-a.score).slice(0,6);
+    const now={x:fan.x,y:fan.y,angle:fan.angle,now:true};
+    const fine=[...top,now];
+    $("res").textContent="Checking the top 6 on a finer grid…";
+    await runPool(fine,{res:32,steps:cool?240:130,iters:40,avg:cool?60:35,obj,fan:fi},(k,score,time,d)=>{Object.assign(fine[k],{fine:score,time,air:d.air,v:d.v});done++;prog();});
+    const best=top.slice().sort((a,b)=>b.fine-a.fine)[0];
+    opt.best=best;
+    if(obj==="feels"){const fb=-best.fine,fn=-now.fine,secs=Math.round(now.time||0);
+      const det=c=>`${c.air.toFixed(1)} °C air at ${c.v.toFixed(2)} m/s`;
+      $("res").innerHTML=fb>=fn-0.05
+        ?`The current spot is already as good as anything found: feels like <b>${fn.toFixed(1)} °C</b> (${det(now)}).`
+        :`Best spot: <b>x ${best.x.toFixed(1)} m, y ${best.y.toFixed(1)} m</b>, facing <b>${bearing(best.angle)}</b>. Feels like <b>${fb.toFixed(1)} °C</b> (${det(best)}), current spot: <b>${fn.toFixed(1)} °C</b> (${det(now)}). After about ${secs} s from the same start.`;
+      $("apply").hidden=!(fb<fn-0.05);
+    }else if(cool){const tb=-best.fine,tn=-now.fine,secs=Math.round(now.time||0);
+      $("res").innerHTML=tb>=tn-0.05
+        ?`The current spot is already as good as anything found: <b>${tn.toFixed(1)} °C</b> around you.`
+        :`Best spot: <b>x ${best.x.toFixed(1)} m, y ${best.y.toFixed(1)} m</b>, facing <b>${bearing(best.angle)}</b>. Air around you: <b>${tb.toFixed(1)} °C</b>, current spot: <b>${tn.toFixed(1)} °C</b> (<b>${(tn-tb).toFixed(1)} K</b> cooler). Both after about ${secs} s from the same start.`;
+      $("apply").hidden=!(tb<tn-0.05);
+    }else{
+    const what=obj==="breeze"?"breeze at you":"mean room air speed";
+    const gain=now.fine>0.05?` (${(best.fine/now.fine).toFixed(1)}× the current spot)`:"";
+    $("res").innerHTML=best.fine<=now.fine+0.01
+      ?`The current spot is already as good as anything found: <b>${now.fine.toFixed(2)} m/s</b> ${what}.`
+      :`Best spot: <b>x ${best.x.toFixed(1)} m, y ${best.y.toFixed(1)} m</b>, facing <b>${bearing(best.angle)}</b>. ${what[0].toUpperCase()+what.slice(1)}: <b>${best.fine.toFixed(2)} m/s</b>, current spot: <b>${now.fine.toFixed(2)} m/s</b>${gain}.`;
+    $("apply").hidden=!(best.fine>now.fine+0.01);}
+  }catch(err){
+    $("res").textContent="The search could not start in this browser. Background workers are blocked here, so try another browser.";opt=null;
+  }
+  busy=false;$("go").disabled=false;$("bar").hidden=true;
+});
+$("apply").addEventListener("click",()=>{
+  if(!opt||!opt.best)return;const f=S.fans[opt.fi];if(!f)return;
+  Object.assign(f,{x:Math.round(opt.best.x*100)/100,y:Math.round(opt.best.y*100)/100,angle:opt.best.angle});
+  geomDirty=true;if(T)T.dirty=true;renderLists();$("apply").hidden=true;
+});
+
+/* ---------- corner 3D view (three.js) ---------- */
+let T=null;
+const at3=(x,y,z)=>new THREE.Vector3(x,z,-y);   // room x,y,z (z up) to three.js x,y,z (y up)
+function initThree(){
+  if(T)return T.ok;
+  T={ok:false};
+  if(!window.THREE){$("three").innerHTML='<p class="note">The 3D view could not load its graphics library. The plan and section views still work.</p>';return false;}
+  let R;
+  try{R=new THREE.WebGLRenderer({antialias:true});}catch(err){$("three").innerHTML='<p class="note">This browser cannot show 3D graphics. The plan and section views still work.</p>';return false;}
+  R.setPixelRatio(Math.min(2,devicePixelRatio||1));
+  $("three").appendChild(R.domElement);
+  const sc=new THREE.Scene();sc.background=new THREE.Color("#0d1b2a");
+  const cam=new THREE.PerspectiveCamera(38,1.6,0.05,200);
+  sc.add(new THREE.HemisphereLight(0xdfe9f0,0x1a2730,0.9));
+  const dl=new THREE.DirectionalLight(0xffffff,0.55);dl.position.set(-4,9,6);sc.add(dl);
+  const ctl=THREE.OrbitControls?new THREE.OrbitControls(cam,R.domElement):null;
+  if(ctl){ctl.enableDamping=true;ctl.dampingFactor=0.12;}
+  const roomG=new THREE.Group();sc.add(roomG);
+  const NP=1400,pos=new Float32Array(NP*6),col=new Float32Array(NP*6);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute("position",new THREE.BufferAttribute(pos,3));geo.setAttribute("color",new THREE.BufferAttribute(col,3));
+  const lines=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.95}));
+  lines.frustumCulled=false;sc.add(lines);
+  const sliceCan=document.createElement("canvas"),sliceTex=new THREE.CanvasTexture(sliceCan);
+  const sliceMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:sliceTex,transparent:true,opacity:0.5,side:THREE.DoubleSide,depthWrite:false}));
+  sliceMesh.rotation.x=-Math.PI/2;sc.add(sliceMesh);
+  Object.assign(T,{ok:true,R,sc,cam,ctl,roomG,NP,pos,col,geo,sliceCan,sliceTex,sliceMesh,parts:[],blades:[],dirty:true,framed:false,w:0,h:0});
+  return true;
+}
+function frame3D(){
+  const {L,W,H}=S.room,D=Math.max(L,W,H);
+  const tgt=at3(L/2,W/2,H*0.3);
+  T.cam.position.copy(at3(L+0.75*D,-0.85*D,H+0.9*D));
+  T.cam.lookAt(tgt);if(T.ctl){T.ctl.target.copy(tgt);T.ctl.update();}
+}
+function buildRoom3D(){
+  const g=T.roomG;
+  while(g.children.length){const c=g.children.pop();c.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
+  T.blades=[];
+  const {L,W,H}=S.room;
+  const M=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:0.85,metalness:0},o||{}));
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(L,W),M(0x2a3a44));fl.rotation.x=-Math.PI/2;fl.position.copy(at3(L/2,W/2,0));g.add(fl);
+  const grid=new THREE.GridHelper(Math.max(L,W),Math.round(Math.max(L,W)),0x3d5260,0x33444f);
+  grid.scale.set(L/Math.max(L,W),1,W/Math.max(L,W));grid.position.copy(at3(L/2,W/2,0.003));g.add(grid);
+  const rb=new THREE.BoxGeometry(L,H,W);
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(rb),new THREE.LineBasicMaterial({color:0x9fb3bb}));edges.position.copy(at3(L/2,W/2,H/2));g.add(edges);
+  const walls=new THREE.Mesh(rb,new THREE.MeshBasicMaterial({color:0x9fb3bb,transparent:true,opacity:0.07,side:THREE.BackSide,depthWrite:false}));walls.position.copy(edges.position);g.add(walls);
+  for(const b of S.boxes){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(Math.max(b.dx,0.01),Math.max(b.dz,0.01),Math.max(b.dy,0.01)),M(0x8a9396));
+    m.position.copy(at3(b.x+b.dx/2,b.y+b.dy/2,b.z+b.dz/2));g.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:0x2d383c}));e.position.copy(m.position);g.add(e);
+  }
+  for(const o of S.openings){
+    const pl=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(o.wu,0.02),Math.max(o.wv,0.02)),new THREE.MeshBasicMaterial({color:o.kind==="supply"?0x6f9ff0:0xeb9a50,transparent:true,opacity:0.75,side:THREE.DoubleSide}));
+    const e=0.01;
+    if(o.face==="W"){pl.position.copy(at3(e,o.u,o.v));pl.rotation.y=Math.PI/2;}
+    else if(o.face==="E"){pl.position.copy(at3(L-e,o.u,o.v));pl.rotation.y=Math.PI/2;}
+    else if(o.face==="S")pl.position.copy(at3(o.u,e,o.v));
+    else if(o.face==="N")pl.position.copy(at3(o.u,W-e,o.v));
+    else{pl.position.copy(at3(o.u,o.v,o.face==="floor"?e:H-e));pl.rotation.x=-Math.PI/2;}
+    g.add(pl);
+  }
+  const white=M(0xe8eef0),dark=M(0x46545b),blade=M(0xcfe3ea,{transparent:true,opacity:0.9});
+  for(const f of S.fans){
+    // a pedestal fan whose local +x axis is the blowing direction
+    const fg=new THREE.Group();fg.position.copy(at3(f.x,f.y,0));fg.rotation.y=f.angle*Math.PI/180;
+    const r=Math.max(0.08,f.d/2),z=Math.max(0.15,f.z);
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.18,0.04,28),dark);base.position.y=0.02;fg.add(base);
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.017,0.017,z-0.04,10),white);pole.position.y=0.04+(z-0.04)/2;fg.add(pole);
+    const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.065,0.075,0.15,20),white);motor.rotation.z=Math.PI/2;motor.position.set(-0.1,z,0);fg.add(motor);
+    for(const gx of [0.04,-0.03]){
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(r,0.01,8,48),white);ring.rotation.y=Math.PI/2;ring.position.set(gx,z,0);fg.add(ring);
+    }
+    const mesh=new THREE.Mesh(new THREE.CircleGeometry(r,40),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.12,side:THREE.DoubleSide,depthWrite:false}));
+    mesh.rotation.y=Math.PI/2;mesh.position.set(0.04,z,0);fg.add(mesh);
+    const bl=new THREE.Group();bl.position.set(0.005,z,0);
+    for(let n=0;n<3;n++){const piv=new THREE.Group();piv.rotation.x=n*2*Math.PI/3;
+      const b=new THREE.Mesh(new THREE.BoxGeometry(0.012,r*0.82,r*0.42),blade);b.position.y=r*0.45;b.rotation.y=0.35;piv.add(b);bl.add(piv);}
+    const hub=new THREE.Mesh(new THREE.SphereGeometry(0.035,14,10),white);bl.add(hub);
+    fg.add(bl);T.blades.push({g:bl,w:Math.min(0.5,0.08*f.speed)});
+    g.add(fg);
+  }
+  const t=S.target,yc=M(0xffd166,{transparent:true,opacity:0.7});
+  const bh=Math.max(0.2,t.z-0.22);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.18,bh,18),yc);body.position.copy(at3(t.x,t.y,bh/2));g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.1,18,12),yc);head.position.copy(at3(t.x,t.y,t.z));g.add(head);
+  const zone=new THREE.Mesh(new THREE.TorusGeometry(0.4,0.008,6,48),new THREE.MeshBasicMaterial({color:0xffd166}));zone.rotation.x=Math.PI/2;zone.position.copy(at3(t.x,t.y,t.z));g.add(zone);
+}
+function spawn3(p){
+  const g=G;for(let tries=0;tries<20;tries++){
+    p.i=0.5+Math.random()*g.nx;p.j=0.5+Math.random()*g.ny;p.k=0.5+Math.random()*g.nz;
+    if(g.flag[cell3(p)]!==1)break;}
+  p.life=50+Math.random()*120;return p;
+}
+function cell3(p){const g=G;return Math.round(p.i)+g.sx*Math.round(p.j)+g.sxy*Math.round(p.k);}
+const v3=[0,0,0],t3=[0,0,0];
+function vel3(i,j,k){
+  const g=G;i=Math.min(Math.max(i,1),g.nx-0.001);j=Math.min(Math.max(j,1),g.ny-0.001);k=Math.min(Math.max(k,1),g.nz-0.001);
+  const i0=i|0,j0=j|0,k0=k|0,fx=i-i0,fy=j-j0,fz=k-k0;v3[0]=v3[1]=v3[2]=0;
+  for(let q=0;q<8;q++){const di=q&1,dj=(q>>1)&1,dk=q>>2,wq=(di?fx:1-fx)*(dj?fy:1-fy)*(dk?fz:1-fz);
+    if(wq===0)continue;g.cvel(i0+di+g.sx*(j0+dj)+g.sxy*(k0+dk),t3);v3[0]+=wq*t3[0];v3[1]+=wq*t3[1];v3[2]+=wq*t3[2];}
+  return v3;
+}
+function particles3D(){
+  const g=G,{nx,ny,nz,h}=g,pos=T.pos,col=T.col,vs=vscale(),k=0.06/h,move=running&&!busy;
+  if(T.parts.length!==T.NP){T.parts=[];for(let n=0;n<T.NP;n++)T.parts.push(spawn3({}));}
+  for(let n=0;n<T.NP;n++){
+    const p=T.parts[n];
+    if((move&&p.life--<=0)||p.i<0.5||p.i>nx+0.5||p.j<0.5||p.j>ny+0.5||p.k<0.5||p.k>nz+0.5||g.flag[cell3(p)]===1)spawn3(p);
+    const v=vel3(p.i,p.j,p.k),vx=v[0],vy=v[1],vz=v[2];
+    if(move){p.i+=vx*k;p.j+=vy*k;p.k+=vz*k;}
+    const x=(p.i-0.5)*h,y=(p.j-0.5)*h,z=(p.k-0.5)*h,tl=0.6,o=n*6;
+    pos[o]=x;pos[o+1]=z;pos[o+2]=-y;pos[o+3]=x-vx*tl;pos[o+4]=z-vz*tl;pos[o+5]=-(y-vy*tl);
+    const c=Math.max(0,Math.min(255,Math.round((0.18+0.82*Math.min(1,Math.hypot(vx,vy,vz)/vs))*255)))*3;
+    col[o]=LUT[c]/255;col[o+1]=LUT[c+1]/255;col[o+2]=LUT[c+2]/255;
+    col[o+3]=col[o]*0.25;col[o+4]=col[o+1]*0.25;col[o+5]=col[o+2]*0.25;
+  }
+  T.geo.attributes.position.needsUpdate=true;T.geo.attributes.color.needsUpdate=true;
+}
+const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function renderThree(){
+  if(T.dirty){buildRoom3D();T.dirty=false;if(!T.framed){frame3D();T.framed=true;}}
+  const w=Math.max(200,$("wrap").clientWidth-12),hh=Math.round(Math.max(260,Math.min(innerHeight*0.66,620)));
+  if(T.w!==w||T.h!==hh){T.R.setSize(w,hh);T.cam.aspect=w/hh;T.cam.updateProjectionMatrix();T.w=w;T.h=hh;}
+  if(fc%6===1||!T.sliceMesh.userData.ok){
+    const s=spec("plan");T.sliceCan.width=s.nh;T.sliceCan.height=s.nv;
+    fillImage(s,T.sliceCan.getContext("2d"),0);T.sliceTex.needsUpdate=true;
+    T.sliceMesh.scale.set(G.nx*G.h,G.ny*G.h,1);
+    T.sliceMesh.position.copy(at3(G.nx*G.h/2,G.ny*G.h/2,(s.fi-0.5)*G.h));T.sliceMesh.userData.ok=true;
+  }
+  particles3D();T.geo.setDrawRange(0,view.trace?T.NP*2:0);
+  if(!reduceMotion&&running)for(const b of T.blades)b.g.rotation.x+=b.w;
+  if(T.ctl)T.ctl.update();
+  T.R.render(T.sc,T.cam);
+}
+
+/* ---------- loop ---------- */
+let fc=0,spf=2;
+function frame(){
+  if(geomDirty){rebuild();geomDirty=false;syncLegend();}
+  if(running&&!busy){const t0=performance.now();for(let n=0;n<spf;n++)G.step(40);
+    const dtm=performance.now()-t0;if(dtm>28&&spf>1)spf--;else if(dtm<10&&spf<4)spf++;}
+  fc++;
+  if(view.mode==="corner"){if(T&&T.ok)renderThree();}else{drawBase();drawParticles();}
+  if(fc%12===0)updateStats();
+  requestAnimationFrame(frame);
+}
+allocate();renderLists();layout();syncSlice();syncLegend();syncTurb();
+for(let n=0;n<120;n++)G.step(40);   // start from a developed flow so the first view already shows the pattern
+updateStats();
+requestAnimationFrame(frame);
+</script>
+
+</body></html>
