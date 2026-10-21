@@ -12,6 +12,8 @@ A browser app that sketches the air flow in a room and searches for the best spo
 - Semi-Lagrangian advection for air speed, first-order upwind flux transport for temperature, SOR pressure projection.
 - Turbulence: eddy viscosity. The default is the Chen and Xu formula with the factor cut to 0.01 (tuned to fan data).
 - A fan is a disk of cells that pushes air at a fixed speed.
+- Oscillating fan (button per fan): the jet direction swings sweep/2 each side of the set direction, as a sine with the given cycle time.
+  The disk of cells keeps its shape at the set direction; only the jet turns. The optimizer then averages over one full swing.
 - Heat: heat sources on boxes and on the person, Boussinesq buoyancy, walls and furniture at a fixed temperature (3 W/m²K).
 - Openings: zero pressure outside, with a sharp-edged loss (discharge coefficient 0.6).
 - "Feels like": air temperature minus the ASHRAE 55 cooling effect, from the Gagge two-node SET model
@@ -33,6 +35,7 @@ node validation/fan-decay.cjs       # fan jet decay against Buildings 2025, 15(3
 | Sealed room, walls at 20 °C | Walls take 500 W at steady state |
 | Window, 3 °C outside | Heat out of the window equal to heat from the walls within 3 % |
 | Default room | Air never colder than the coldest input |
+| Oscillating fan | Jet follows the set swing within 0.5°; energy balance as above; more breeze 40° off axis than a fixed fan |
 | Cooling effect | Equal to pythermalcomfort within 0.02 K |
 | Annex 20 | RMS 0.157 of U0 (23 cm grid) |
 | Fan jet decay | RMS 0.055 (9.4 cm grid); the same data was used to tune the model |
