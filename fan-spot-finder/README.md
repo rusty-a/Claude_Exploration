@@ -3,8 +3,8 @@
 A browser app that sketches the air flow in a room and searches for the best spot for a pedestal fan.
 Open `app/index.html` in a browser. It needs no build step.
 
-**Status: a rough model.** Use it to compare fan spots, not to promise numbers. Read
-[docs/critical-review.md](docs/critical-review.md) before you trust a result.
+**Status: a rough model.** 
+[docs/critical-review.md](docs/critical-review.md) 
 
 ## Model
 
