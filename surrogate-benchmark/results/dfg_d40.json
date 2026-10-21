@@ -1,0 +1,5 @@
+{
+ "d": 40, "nx": 880, "ny": 164, "tau": 0.56,
+ "note": "run with an early version of validate_dfg.py; t_end = 60 D/U, window t = 45..60",
+ "cd_max": 3.358, "cd_mean": 3.275, "cl_max": 1.036, "st": 0.3046
+}
