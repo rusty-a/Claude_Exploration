@@ -1,0 +1,26 @@
+name: fan-spot-finder
+on:
+  push:
+    paths: ["fan-spot-finder/**", ".github/workflows/fan-spot-finder.yml"]
+  pull_request:
+    paths: ["fan-spot-finder/**", ".github/workflows/fan-spot-finder.yml"]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults: {run: {working-directory: fan-spot-finder}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: node --test tests/*.test.cjs
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults: {run: {working-directory: fan-spot-finder}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: node validation/annex20.cjs
+      - run: node validation/fan-decay.cjs
