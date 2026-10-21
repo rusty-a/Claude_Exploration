@@ -1,0 +1,5 @@
+/data
+__pycache__/
+*.pyc
+results/rollout_*.npy
+logs/
